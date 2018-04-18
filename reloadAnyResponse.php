@@ -74,7 +74,7 @@ class reloadAnyResponse extends PluginBase {
     $this->subscribe('beforeActivate');
     $oPlugin = Plugin::model()->find("name = :name",array("name"=>get_class($this)));
     if($oPlugin && $oPlugin->active) {
-      $this->_addHelpersModels();
+      $this->_setConfig();
     }
     /* Managing unique code */
     $this->subscribe('afterModelSave');
@@ -168,8 +168,12 @@ class reloadAnyResponse extends PluginBase {
 
     /* Delete all link when set a survey to inactive (@todo : test it) */
     if($className == 'Survey') {
-      if($oModel->active != 'Y') {
-        \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = sid",array('sid'=>$sid));
+      $sid = isset($oModel->sid) ? $oModel->sid : null;
+      if($oModel->sid && $oModel->active != 'Y') {
+        $deleted = \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = sid",array('sid'=>$oModel->sid));
+        if($deleted>0) { // Don't log each time, can be saved for something other …
+          $this->log(sprintf("%d responseLink deleted for %d",$deleted,$oModel->sid),CLogger::LEVEL_INFO);
+        }
       }
     }
 
@@ -194,9 +198,7 @@ class reloadAnyResponse extends PluginBase {
           if(!$responseLink->save()) {
             $this->log("Unable to save responseLink with following errors.",CLogger::LEVEL_ERROR);
             $this->log(CVarDumper::dumpAsString($responseLink->getErrors()),CLogger::LEVEL_ERROR);
-            Yii::log("Unable to save responseLink with following errors.", CLogger::LEVEL_ERROR,'application.plugins.reloadAnyResponse.afterModelSave');
-            Yii::log(CVarDumper::dumpAsString($responseLink->getErrors()), CLogger::LEVEL_ERROR,'application.plugins.reloadAnyResponse.afterModelSave');
-          } 
+          }
         }
       }
     }
@@ -277,7 +279,7 @@ class reloadAnyResponse extends PluginBase {
    * Add needed alias and put it in autoloader
    * @return void
    */
-  private function _addHelpersModels()
+  private function _setConfig()
   {
     Yii::setPathOfAlias(get_class($this), dirname(__FILE__));
   }
@@ -319,5 +321,18 @@ class reloadAnyResponse extends PluginBase {
     loadanswers();
     randomizationGroupsAndQuestions($surveyid);
     initFieldArray($surveyid, $_SESSION['survey_'.$surveyid]['fieldmap']);
+  }
+
+  /**
+   * @inheritdoc adding string, by default current event
+   * @param string
+   */
+  public function log($message, $level = \CLogger::LEVEL_TRACE,$logDetail = null)
+  {
+    if(!$logDetail && $this->getEvent()) {
+      $logDetail = $this->getEvent()->getEventName();
+    } // What to put if no event ?
+    parent::log($message, $level);
+    Yii::log($message, $level,'application.plugins.reloadAnyResponse.'.$logDetail);
   }
 }
