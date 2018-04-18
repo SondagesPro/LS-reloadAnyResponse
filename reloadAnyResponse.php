@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.1.0
+ * @version 0.2.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,8 +47,24 @@ class reloadAnyResponse extends PluginBase {
             'value'=>1,
             'uncheckValue'=>0,
         ),
-        'label'=>"Create unique code for all surveys, and allow get survey by unique code.",
+        'label'=>"Create automatically unique code for all surveys.",
+        'help'=>"If code exist, it can be always used.",
         'default'=>0,
+    ),
+    'uniqueCodeAccess' => array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label'=>"Allow entering unique code for all surveys if exist.",
+        'help'=>"If you set to no, this disable usage for other plugins.",
+        'default'=>1,
+    ),
+    'uniqueCodeCode' => array(
+        'type'=>'string',
+        'label'=>"Code in GET params to test.",
+        'default'=>'code',
     ),
   );
 
@@ -84,6 +100,7 @@ class reloadAnyResponse extends PluginBase {
     /* currentDefault translation */
     $allowAdminUserDefault = $this->get('allowAdminUser',null,null,$this->settings['allowAdminUser']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeCreateDefault = $this->get('uniqueCodeCreate',null,null,$this->settings['uniqueCodeCreate']['default']) ? gT('Yes') : gT('No');
+    $uniqueCodeAccessDefault = $this->get('uniqueCodeAccess',null,null,$this->settings['uniqueCodeAccess']['default']) ? gT('Yes') : gT('No');
 
     $oEvent->set("surveysettings.{$this->id}", array(
       'name' => get_class($this),
@@ -102,7 +119,7 @@ class reloadAnyResponse extends PluginBase {
         ),
         'uniqueCodeCreate'=>array(
           'type'=>'select',
-          'label'=>$this->gT("Create unique code for all surveys, and allow get survey by unique code."),
+          'label'=>$this->gT("Create automatically code."),
           'options'=>array(
             1 =>gT("Yes"),
             0 =>gT("No"),
@@ -111,6 +128,18 @@ class reloadAnyResponse extends PluginBase {
             'empty' => CHtml::encode(sprintf($this->gT("Use default (%s)"),$uniqueCodeCreateDefault)),
           ),
           'current'=>$this->get('uniqueCodeCreate','Survey',$oEvent->get('survey'),"")
+        ),
+        'uniqueCodeAccess'=>array(
+          'type'=>'select',
+          'label'=>$this->gT("Allow entering unique code if exist."),
+          'options'=>array(
+            1 =>gT("Yes"),
+            0 =>gT("No"),
+          ),
+          'htmlOptions'=>array(
+            'empty' => CHtml::encode(sprintf($this->gT("Use default (%s)"),$uniqueCodeAccessDefault)),
+          ),
+          'current'=>$this->get('uniqueCodeAccess','Survey',$oEvent->get('survey'),"")
         ),
       ),
     ));
@@ -140,7 +169,7 @@ class reloadAnyResponse extends PluginBase {
     /* Delete all link when set a survey to inactive (@todo : test it) */
     if($className == 'Survey') {
       if($oModel->active != 'Y') {
-        responseLink::model()->deleteAll("sid = sid",array('sid'=>$sid));
+        \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = sid",array('sid'=>$sid));
       }
     }
 
@@ -153,11 +182,11 @@ class reloadAnyResponse extends PluginBase {
       }
       $srid = isset($oModel->id) ? $oModel->id : null;
       if($sid && $srid) {
-        $responseLink = responseLink::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
+        $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
         if(!$responseLink) {
           $token = isset($oModel->token) ? $oModel->token : null;
           $accesscode = Yii::app()->securityManager->generateRandomString(42);
-          $responseLink = New responseLink;
+          $responseLink = New \reloadAnyResponse\models\responseLink;
           $responseLink->sid = $sid;
           $responseLink->srid = $srid;
           $responseLink->token = $token;
@@ -180,7 +209,7 @@ class reloadAnyResponse extends PluginBase {
       $sid = str_replace(array('{{survey_','}}'),array('',''),$oModel->tableName());
       $srid = isset($oModel->id) ? $oModel->id : null;
       if($srid) {
-        responseLink::model()->deleteByPk(array('sid'=>$sid,'srid'=>$srid));
+        \reloadAnyResponse\models\responseLink::model()->deleteByPk(array('sid'=>$sid,'srid'=>$srid));
       }
     }
   }
@@ -193,16 +222,16 @@ class reloadAnyResponse extends PluginBase {
     if(!$srid) {
         return;
     }
-    $accesscode = App()->getRequest()->getQuery('code');
+    $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeAccess'),null,null,$this->settings['uniqueCodeAccess']['default']);
     $responseLink = null;
-    if($srid && $accesscode && $this->_getIsActive('uniqueCodeCreate',$surveyid)) {
-      $responseLink = responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
+    if($srid && $accesscode && $this->_getIsActive('uniqueCodeAccess',$surveyid)) {
+      $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
       if(!$responseLink || $responseLink->accesscode != $accesscode) {
         // @todo Throw error ? or not ?
       }
     }
     if(!$responseLink && $this->_getIsActive('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
-      $responseLink = responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
+      $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
       if(!$responseLink) {
         // @todo : throw error ? or not ?
       }
@@ -221,7 +250,7 @@ class reloadAnyResponse extends PluginBase {
    */
   private function _getIsActivate($setting,$surveyid)
   {
-    $activation = $this->get($setting,'Survey',$sid,"");
+    $activation = $this->get($setting,'Survey',$surveyid,"");
     if($activation === '') {
       $activation = $this->get($setting,null,null,$this->settings[$setting]['default']);
     }
@@ -251,7 +280,6 @@ class reloadAnyResponse extends PluginBase {
   private function _addHelpersModels()
   {
     Yii::setPathOfAlias(get_class($this), dirname(__FILE__));
-    Yii::import(get_class($this).".models.responseLink");
   }
 
   /**

@@ -1,6 +1,8 @@
 <?php
 /**
  */
+namespace reloadAnyResponse\models;
+use CActiveRecord;
 class responseLink extends CActiveRecord
 {
     public static function model($className=__CLASS__) {
