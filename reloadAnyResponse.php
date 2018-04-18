@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.0.0
+ * @version 0.1.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,20 +19,110 @@
  */
 class reloadAnyResponse extends PluginBase {
 
+  protected $storage = 'DbStorage';
+
   static protected $description = 'New class and function allowing to reload any survey.';
   static protected $name = 'reloadAnyResponse';
 
+  /**
+   * @var array[] the settings
+   */
+  protected $settings = array(
+    'information' => array(
+        'type' => 'info',
+        'content' => 'The default settings for all surveys. Remind no system is set in this plugin to show or send link to user.',
+    ),
+    'allowAdminUser' => array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label'=>"Allow admin user to reload any survey with response id.",
+        'default'=>1,
+    ),
+    'uniqueCodeCreate' => array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label'=>"Create unique code for all surveys, and allow get survey by unique code.",
+        'default'=>0,
+    ),
+  );
+
+  /** @inheritdoc **/
   public function init()
   {
     $this->subscribe('beforeActivate');
-    //$this->_updateConfig();
     $oPlugin = Plugin::model()->find("name = :name",array("name"=>get_class($this)));
     if($oPlugin && $oPlugin->active) {
       $this->_addHelpersModels();
     }
+    /* Managing unique code */
     $this->subscribe('afterModelSave');
     $this->subscribe('afterModelDelete');
+    /* Get the survey by srid and code */
     $this->subscribe('beforeSurveyPage');
+    /* Survey settings */
+    $this->subscribe('beforeSurveySettings');
+    $this->subscribe('newSurveySettings');
+  }
+
+  /** @inheritdoc **/
+  public function getPluginSettings($getValues=true)
+  {
+    /* @todo translation of label and help */
+    return parent::getPluginSettings($getValues);
+  }
+
+  /** @inheritdoc **/
+  public function beforeSurveySettings()
+  {
+    $oEvent = $this->event;
+    /* currentDefault translation */
+    $allowAdminUserDefault = $this->get('allowAdminUser',null,null,$this->settings['allowAdminUser']['default']) ? gT('Yes') : gT('No');
+    $uniqueCodeCreateDefault = $this->get('uniqueCodeCreate',null,null,$this->settings['uniqueCodeCreate']['default']) ? gT('Yes') : gT('No');
+
+    $oEvent->set("surveysettings.{$this->id}", array(
+      'name' => get_class($this),
+      'settings' => array(
+        'allowAdminUser'=>array(
+          'type'=>'select',
+          'label'=>$this->gT("Allow admin user to reload any survey with response id."),
+          'options'=>array(
+            1 =>gT("Yes"),
+            0 =>gT("No"),
+          ),
+          'htmlOptions'=>array(
+            'empty' => CHtml::encode(sprintf($this->gT("Use default (%s)"),$allowAdminUserDefault)),
+          ),
+          'current'=>$this->get('allowAdminUser','Survey',$oEvent->get('survey'),"")
+        ),
+        'uniqueCodeCreate'=>array(
+          'type'=>'select',
+          'label'=>$this->gT("Create unique code for all surveys, and allow get survey by unique code."),
+          'options'=>array(
+            1 =>gT("Yes"),
+            0 =>gT("No"),
+          ),
+          'htmlOptions'=>array(
+            'empty' => CHtml::encode(sprintf($this->gT("Use default (%s)"),$uniqueCodeCreateDefault)),
+          ),
+          'current'=>$this->get('uniqueCodeCreate','Survey',$oEvent->get('survey'),"")
+        ),
+      ),
+    ));
+  }
+
+  /** @inheritdoc **/
+  public function newSurveySettings()
+  {
+    $event = $this->event;
+    foreach ($event->get('settings') as $name => $value) {
+      $this->set($name, $value, 'Survey', $event->get('survey'));
+    }
   }
 
   /** @inheritdoc **/
@@ -46,11 +136,23 @@ class reloadAnyResponse extends PluginBase {
   {
     $oModel = $this->getEvent()->get('model');
     $className = get_class($oModel);
+
+    /* Delete all link when set a survey to inactive (@todo : test it) */
+    if($className == 'Survey') {
+      if($oModel->active != 'Y') {
+        responseLink::model()->deleteAll("sid = sid",array('sid'=>$sid));
+      }
+    }
+
+    /* Create responlink for survey and srid (work when start a survey) */
     if($className == 'SurveyDynamic' || $className == 'Response') {
       $sid = str_replace(array('{{survey_','}}'),array('',''),$oModel->tableName());
+      /* Test for sid activation */
+      if(!$this->_getIsActivate('uniqueCodeCreate',$sid)) {
+        return;
+      }
       $srid = isset($oModel->id) ? $oModel->id : null;
-      tracevar($srid);
-      if($srid) {
+      if($sid && $srid) {
         $responseLink = responseLink::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
         if(!$responseLink) {
           $token = isset($oModel->token) ? $oModel->token : null;
@@ -61,17 +163,13 @@ class reloadAnyResponse extends PluginBase {
           $responseLink->token = $token;
           $responseLink->accesscode = $accesscode;
           if(!$responseLink->save()) {
-            tracevar($responseLink->getErrors());
+            $this->log("Unable to save responseLink with following errors.",CLogger::LEVEL_ERROR);
+            $this->log(CVarDumper::dumpAsString($responseLink->getErrors()),CLogger::LEVEL_ERROR);
+            Yii::log("Unable to save responseLink with following errors.", CLogger::LEVEL_ERROR,'application.plugins.reloadAnyResponse.afterModelSave');
+            Yii::log(CVarDumper::dumpAsString($responseLink->getErrors()), CLogger::LEVEL_ERROR,'application.plugins.reloadAnyResponse.afterModelSave');
           } 
         }
       }
-      if($className == 'Survey') {
-        if($oModel->active != 'Y') {
-          responseLink::model()->deleteAll("sid = sid",array('sid'=>$sid));
-        }
-      }
-      //include("/home/sondages.pro/htdocs/clients/complets/draafbfc/LimeSurvey/plugins/reloadAnyResponse/models/responseLink.php");
-      //tracevar($oModel->id);
     }
   }
 
@@ -96,17 +194,17 @@ class reloadAnyResponse extends PluginBase {
         return;
     }
     $accesscode = App()->getRequest()->getQuery('code');
-    if($srid && $accesscode) {
+    $responseLink = null;
+    if($srid && $accesscode && $this->_getIsActive('uniqueCodeCreate',$surveyid)) {
       $responseLink = responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
       if(!$responseLink || $responseLink->accesscode != $accesscode) {
-        // @todo Throw error
-        $responseLink = null;
+        // @todo Throw error ? or not ?
       }
     }
-    if(!$responseLink && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
+    if(!$responseLink && $this->_getIsActive('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
       $responseLink = responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
       if(!$responseLink) {
-        // @todo : throw 404 error
+        // @todo : throw error ? or not ?
       }
     }
     if(!$responseLink) {
@@ -114,9 +212,24 @@ class reloadAnyResponse extends PluginBase {
     }
     $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
   }
+
+  /**
+   * Get boolean value for setting activation
+   * @param string existing $setting
+   * @param integer $surveyid
+   * @return boolean
+   */
+  private function _getIsActivate($setting,$surveyid)
+  {
+    $activation = $this->get($setting,'Survey',$sid,"");
+    if($activation === '') {
+      $activation = $this->get($setting,null,null,$this->settings[$setting]['default']);
+    }
+    return (bool) $activation;
+  }
   /**
    * Create needed DB
-   * @return boolean
+   * @return viod
    */
   private function _createDb()
   {
@@ -131,6 +244,10 @@ class reloadAnyResponse extends PluginBase {
     }
   }
 
+  /**
+   * Add needed alias and put it in autoloader
+   * @return void
+   */
   private function _addHelpersModels()
   {
     Yii::setPathOfAlias(get_class($this), dirname(__FILE__));
@@ -162,7 +279,7 @@ class reloadAnyResponse extends PluginBase {
     $_SESSION['survey_'.$surveyid]['srid'] = $oResponse->id;
     if (!empty($oResponse->lastpage)) {
         $_SESSION['survey_'.$surveyid]['LEMtokenResume'] = true;
-        // If the response was completed and user is allowed to edit after completion start at the beginning and not at the last page - just makes more sense
+        // If the response was completed start at the beginning and not at the last page - just makes more sense
         if (empty($oResponse->submitdate)) {
             $_SESSION['survey_'.$surveyid]['step'] = $oResponse->lastpage;
         }
