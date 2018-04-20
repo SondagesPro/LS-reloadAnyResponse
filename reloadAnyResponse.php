@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.2.0
+ * @version 0.3.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -61,11 +61,11 @@ class reloadAnyResponse extends PluginBase {
         'help'=>"If you set to no, this disable usage for other plugins.",
         'default'=>1,
     ),
-    'uniqueCodeCode' => array(
-        'type'=>'string',
-        'label'=>"Code in GET params to test.",
-        'default'=>'code',
-    ),
+    //~ 'uniqueCodeCode' => array(
+        //~ 'type'=>'string',
+        //~ 'label'=>"Code in GET params to test.",
+        //~ 'default'=>'code',
+    //~ ),
   );
 
   /** @inheritdoc **/
@@ -181,21 +181,18 @@ class reloadAnyResponse extends PluginBase {
     if($className == 'SurveyDynamic' || $className == 'Response') {
       $sid = str_replace(array('{{survey_','}}'),array('',''),$oModel->tableName());
       /* Test for sid activation */
-      if(!$this->_getIsActivate('uniqueCodeCreate',$sid)) {
+      if(!$this->_getIsActivated('uniqueCodeCreate',$sid)) {
         return;
       }
       $srid = isset($oModel->id) ? $oModel->id : null;
       if($sid && $srid) {
         $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
+        /* @todo : add a way to reset potential token ? */
         if(!$responseLink) {
+          /* @todo replace by \reloadAnyResponse\models\responseLink::getResponseLink('sid'=>$sid,'srid'=>$srid,$token,false) */
           $token = isset($oModel->token) ? $oModel->token : null;
-          $accesscode = Yii::app()->securityManager->generateRandomString(42);
-          $responseLink = New \reloadAnyResponse\models\responseLink;
-          $responseLink->sid = $sid;
-          $responseLink->srid = $srid;
-          $responseLink->token = $token;
-          $responseLink->accesscode = $accesscode;
-          if(!$responseLink->save()) {
+          $responseLink = \reloadAnyResponse\models\responseLink::setResponseLink($sid,$srid,$token);
+          if(!$responseLink) {
             $this->log("Unable to save responseLink with following errors.",CLogger::LEVEL_ERROR);
             $this->log(CVarDumper::dumpAsString($responseLink->getErrors()),CLogger::LEVEL_ERROR);
           }
@@ -224,15 +221,20 @@ class reloadAnyResponse extends PluginBase {
     if(!$srid) {
         return;
     }
-    $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeAccess'),null,null,$this->settings['uniqueCodeAccess']['default']);
+    //~ $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeCode'),null,null,$this->settings['uniqueCodeCode']['default']);
+    $accesscode = App()->getRequest()->getQuery('code');
     $responseLink = null;
-    if($srid && $accesscode && $this->_getIsActive('uniqueCodeAccess',$surveyid)) {
+    if($srid && $accesscode && $this->_getIsActivated('uniqueCodeAccess',$surveyid)) {
       $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
-      if(!$responseLink || $responseLink->accesscode != $accesscode) {
-        // @todo Throw error ? or not ?
+      if(!$responseLink) {
+        // @todo Throw 404 error
+      }
+      if($responseLink && $responseLink->accesscode != $accesscode) {
+        // @todo Throw 401 error
+        $responseLink = null;
       }
     }
-    if(!$responseLink && $this->_getIsActive('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
+    if(!$responseLink && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
       $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
       if(!$responseLink) {
         // @todo : throw error ? or not ?
@@ -250,7 +252,7 @@ class reloadAnyResponse extends PluginBase {
    * @param integer $surveyid
    * @return boolean
    */
-  private function _getIsActivate($setting,$surveyid)
+  private function _getIsActivated($setting,$surveyid)
   {
     $activation = $this->get($setting,'Survey',$surveyid,"");
     if($activation === '') {
