@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.3.0
+ * @version 0.4.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,6 +39,15 @@ class reloadAnyResponse extends PluginBase {
             'uncheckValue'=>0,
         ),
         'label'=>"Allow admin user to reload any survey with response id.",
+        'default'=>1,
+    ),
+    'allowToken' => array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label'=>"Allow user with a valid token.",
         'default'=>1,
     ),
     'uniqueCodeCreate' => array(
@@ -81,6 +90,8 @@ class reloadAnyResponse extends PluginBase {
     $this->subscribe('afterModelDelete');
     /* Get the survey by srid and code */
     $this->subscribe('beforeSurveyPage');
+    /* Replace existing system if srid = new */
+    $this->subscribe('beforeLoadResponse');
     /* Survey settings */
     $this->subscribe('beforeSurveySettings');
     $this->subscribe('newSurveySettings');
@@ -204,6 +215,8 @@ class reloadAnyResponse extends PluginBase {
   /** @inheritdoc **/
   public function afterModelDelete()
   {
+    $oModel = $this->getEvent()->get('model');
+    $className = get_class($oModel);
     if($className == 'SurveyDynamic' || $className == 'Response') {
       $sid = str_replace(array('{{survey_','}}'),array('',''),$oModel->tableName());
       $srid = isset($oModel->id) ? $oModel->id : null;
@@ -213,36 +226,55 @@ class reloadAnyResponse extends PluginBase {
     }
   }
 
+  /** @See event */
+  public function beforeLoadResponse()
+  {
+    $srid = App()->getRequest()->getQuery('srid');
+    if($srid=='new') {
+      $this->getEvent()->set('response',false);
+    }
+  }
   /** @inheritdoc **/
   public function beforeSurveyPage()
   {
+
     $srid = App()->getRequest()->getQuery('srid');
     $surveyid = $this->getEvent()->get('surveyId');
     if(!$srid) {
         return;
     }
-    //~ $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeCode'),null,null,$this->settings['uniqueCodeCode']['default']);
-    $accesscode = App()->getRequest()->getQuery('code');
-    $responseLink = null;
-    if($srid && $accesscode && $this->_getIsActivated('uniqueCodeAccess',$surveyid)) {
-      $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
-      if(!$responseLink) {
-        // @todo Throw 404 error
-      }
-      if($responseLink && $responseLink->accesscode != $accesscode) {
-        // @todo Throw 401 error
-        $responseLink = null;
-      }
-    }
-    if(!$responseLink && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
-      $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
-      if(!$responseLink) {
-        // @todo : throw error ? or not ?
-      }
-    }
-    if(!$responseLink) {
+
+    $token = App()->getRequest()->getParam('token');
+    if($srid == "new" && $token) {
         return;
     }
+    //~ $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeCode'),null,null,$this->settings['uniqueCodeCode']['default']);
+    $accesscode = App()->getRequest()->getQuery('code');
+    $editAllowed = false;
+    if($srid && $accesscode && $this->_getIsActivated('uniqueCodeAccess',$surveyid)) {
+      $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
+      if($responseLink && $responseLink->accesscode == $accesscode) {
+          $editAllowed = true;
+      }
+      if(!$responseLink) {
+            throw new CHttpException(404,$this->gT("Sorry, this response didn't exist."));
+      }
+      if($responseLink && $responseLink->accesscode != $accesscode) {
+            throw new CHttpException(401,$this->gT("Sorry, this access code is invalid."));
+      }
+    }
+    if(!$editAllowed && $this->_getIsActivated('allowToken',$surveyid) && !Survey::model()->findByPk($surveyid)->getIsAnonymized()) {
+      $editAllowed = true;
+    }
+    if(!$editAllowed && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
+      $editAllowed = true;
+    }
+    
+    if(!$editAllowed) {
+        throw new CHttpException(401,$this->gT("Sorry, something happen bad."));
+        return;
+    }
+
     $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
   }
 
@@ -287,7 +319,7 @@ class reloadAnyResponse extends PluginBase {
   }
 
   /**
-   * Create Survey and oad response in $_SESSION
+   * Create Survey and add current response in $_SESSION
    * @param integer $surveydi
    * @param integer $srid
    * @throws Error 404
@@ -295,7 +327,11 @@ class reloadAnyResponse extends PluginBase {
    */
   private function _loadReponse($surveyid,$srid,$token = null)
   {
-    
+
+    if(isset($_SESSION['survey_'.$surveyid]['srid']) && $_SESSION['survey_'.$surveyid]['srid'] == $srid) {
+      return;
+    }
+
     $oResponse = SurveyDynamic::model($surveyid)->find("id = :srid",array(':srid'=>$srid));
     if(!$oResponse) {
       throw new CHttpException(404, $this->gT('Response not found.'));
@@ -307,6 +343,7 @@ class reloadAnyResponse extends PluginBase {
         throw new CHttpException(401, $this->gT('Access to this response need valid token.'));
       }
     }
+    killSurveySession($surveyid); // Is this needed ?
     LimeExpressionManager::SetDirtyFlag();
     $_SESSION['survey_'.$surveyid]['srid'] = $oResponse->id;
     if (!empty($oResponse->lastpage)) {
@@ -315,14 +352,20 @@ class reloadAnyResponse extends PluginBase {
         if (empty($oResponse->submitdate)) {
             $_SESSION['survey_'.$surveyid]['step'] = $oResponse->lastpage;
         }
+        if(!empty($oResponse->submitdate) && $oSurvey->alloweditaftercompletion != 'Y') {
+            $oResponse->submitdate = null;
+            $oResponse->save();
+            // Better to set Survey to alloweditaftercompletion == 'Y', but unable at this time on afterFindSurvey event
+        }
     }
     buildsurveysession($surveyid);
     if (!empty($oResponse->submitdate)) {
         $_SESSION['survey_'.$surveyid]['maxstep'] = $_SESSION['survey_'.$surveyid]['totalsteps'];
     }
-    loadanswers();
+
     randomizationGroupsAndQuestions($surveyid);
     initFieldArray($surveyid, $_SESSION['survey_'.$surveyid]['fieldmap']);
+    loadanswers();
   }
 
   /**
@@ -337,4 +380,5 @@ class reloadAnyResponse extends PluginBase {
     parent::log($message, $level);
     Yii::log($message, $level,'application.plugins.reloadAnyResponse.'.$logDetail);
   }
+  
 }
