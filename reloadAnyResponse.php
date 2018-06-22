@@ -231,22 +231,26 @@ class reloadAnyResponse extends PluginBase {
   {
     $srid = App()->getRequest()->getQuery('srid');
     if($srid=='new') {
-      $this->getEvent()->set('response',false);
+        $surveyid = $this->getEvent()->get('surveyId');
+        $token = App()->getRequest()->getParam('token');
+        $this->getEvent()->set('response',
+            $this->_createNewResponse($surveyid,$token)
+        );
     }
   }
   /** @inheritdoc **/
   public function beforeSurveyPage()
   {
-
     $srid = App()->getRequest()->getQuery('srid');
     $surveyid = $this->getEvent()->get('surveyId');
     if(!$srid) {
         return;
     }
-
+    $oSurvey = Survey::model()->findByPk($surveyid);
     $token = App()->getRequest()->getParam('token');
-    if($srid == "new" && $token) {
-        return;
+    if($srid == "new") {
+        // Done in beforeLoadResponse
+      return;
     }
     //~ $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeCode'),null,null,$this->settings['uniqueCodeCode']['default']);
     $accesscode = App()->getRequest()->getQuery('code');
@@ -263,7 +267,7 @@ class reloadAnyResponse extends PluginBase {
             throw new CHttpException(401,$this->gT("Sorry, this access code is invalid."));
       }
     }
-    if(!$editAllowed && $this->_getIsActivated('allowToken',$surveyid) && !Survey::model()->findByPk($surveyid)->getIsAnonymized()) {
+    if(!$editAllowed && $this->_getIsActivated('allowToken',$surveyid) && !$oSurvey->getIsAnonymized()) {
       $editAllowed = true;
     }
     if(!$editAllowed && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
@@ -331,7 +335,6 @@ class reloadAnyResponse extends PluginBase {
     if(isset($_SESSION['survey_'.$surveyid]['srid']) && $_SESSION['survey_'.$surveyid]['srid'] == $srid) {
       return;
     }
-
     $oResponse = SurveyDynamic::model($surveyid)->find("id = :srid",array(':srid'=>$srid));
     if(!$oResponse) {
       throw new CHttpException(404, $this->gT('Response not found.'));
@@ -368,6 +371,54 @@ class reloadAnyResponse extends PluginBase {
     loadanswers();
   }
 
+  /**
+   * Create a new response for token
+   * @param int $surveyid
+   * @param string $token
+   * @return null|\Response
+   */
+  private function _createNewResponse($surveyid,$token) {
+      $oSurvey = Survey::model()->findByPk($surveyid);
+      if(!$oSurvey->getHasTokensTable()) {
+        return;
+      }
+      if($oSurvey->getIsAnonymized()) {
+        return;
+      }
+      if(!$oSurvey->tokenanswerspersistence) {
+        return;
+      }
+      if(!$oSurvey->alloweditaftercompletion) {
+        return;
+      }
+    /* some control */
+    if(!(
+      ($this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','create'))
+      ||
+      ($this->_getIsActivated('allowToken',$surveyid))
+      )) {
+      // Disable here
+      $this->log("Try to create a new reponse with token but without right",'warning');
+      return;
+    }
+    $oToken = Token::model($surveyid)->findByAttributes(array('token' => $token));
+    if(empty($oToken)) {
+      return;
+    }
+    $oResponse = Response::create($surveyid);
+    $oResponse->token = $oToken->token;
+    $oResponse->startlanguage = Yii::app()->getLanguage();
+    /* @todo generate if not set */
+    $oResponse->seed = isset($_SESSION['survey_'.$surveyid]['startingValues']['seed']) ? $_SESSION['survey_'.$surveyid]['startingValues']['seed'] : null;
+    $oResponse->lastpage=-1;
+    if($oSurvey->datestamp == 'Y') {
+        $date = dateShift(date("Y-m-d H:i:s"), "Y-m-d H:i:s", Yii::app()->getConfig('timeadjust'));
+        $oResponse->datestamp = $date;
+        $oResponse->startdate = $date;
+    }
+    $oResponse->save();
+    return $oResponse;
+  }
   /**
    * @inheritdoc adding string, by default current event
    * @param string
