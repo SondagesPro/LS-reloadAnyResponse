@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.4.0
+ * @version 0.5.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -70,6 +70,38 @@ class reloadAnyResponse extends PluginBase {
         'help'=>"If you set to no, this disable usage for other plugins.",
         'default'=>1,
     ),
+    'disableMultiAccess' => array(
+        'type'=>'info',
+        'content'=>"<div class='alert alert-info'>You need renderMessage for disabling multiple access.</div>",
+        'default'=>1,
+    ),
+    'multiAccessTime'=>array(
+        'type'=>'int',
+        'label' => 'Time for disable multiple access (in minutes)',
+        'help' => 'Before save value or entering survey : test if someone else edit response in this last minutes. Disable save and show a message if yes. Set to empty disable system but then answer of user can be deleted by another user without any information…',
+        'htmlOptions'=>array(
+            'min'=>1,
+        ),
+        'default' => 20,
+    ),
+    //~ 'multiAccessTimeOptOut'=>array(
+        //~ 'type'=>'int',
+        //~ 'label' => 'Auto save and close current responses (with a javascript solution) in minutes.',
+        //~ 'help' => 'If user didn‘t do any action on his browser during access time, save and close the windows. Set to an empty disable this feature.',
+        //~ 'htmlOptions'=>array(
+            //~ 'min'=>1,
+        //~ ),
+        //~ 'default' => 20,
+    //~ ),
+    //~ 'multiAccessTimeAlert'=>array(
+        //~ 'type'=>'int',
+        //~ 'label' => 'Time for alert shown for optout of survey',
+        //~ 'help' => 'Set to empty to disable. This alert is shown after X minutes, where X is the number here.',
+        //~ 'htmlOptions'=>array(
+            //~ 'min'=>1,
+        //~ ),
+        //~ 'default' => 18,
+    //~ ),
     //~ 'uniqueCodeCode' => array(
         //~ 'type'=>'string',
         //~ 'label'=>"Code in GET params to test.",
@@ -89,12 +121,17 @@ class reloadAnyResponse extends PluginBase {
     $this->subscribe('afterModelSave');
     $this->subscribe('afterModelDelete');
     /* Get the survey by srid and code */
+    /* Save current session */
     $this->subscribe('beforeSurveyPage');
     /* Replace existing system if srid = new */
     $this->subscribe('beforeLoadResponse');
     /* Survey settings */
     $this->subscribe('beforeSurveySettings');
     $this->subscribe('newSurveySettings');
+    /* delete current session*/
+    $this->subscribe("afterSurveyComplete",'deleteSurveySession');
+    $this->subscribe("afterSurveyQuota",'deleteSurveySession');
+
   }
 
   /** @inheritdoc **/
@@ -237,51 +274,101 @@ class reloadAnyResponse extends PluginBase {
             $this->_createNewResponse($surveyid,$token)
         );
     }
-  }
-  /** @inheritdoc **/
-  public function beforeSurveyPage()
-  {
-    $srid = App()->getRequest()->getQuery('srid');
-    $surveyid = $this->getEvent()->get('surveyId');
-    if(!$srid) {
-        return;
+    /* control multi access to token with token and allow edit reponse */
+    $surveyId = $this->getEvent()->get('surveyId');
+    $oSurvey = Survey::model()->findByPk($surveyId);
+    if($oSurvey && $oSurvey->alloweditaftercompletion == "Y" && $oSurvey->tokenanswerspersistence == "Y") {
+        /* Get like limesurvey (in this situation) : get the last srid with this token (without plugin …) */
+        $oResponse = Response::model($surveyid)->find(array(
+            'select' => 'id',
+            'condition' => 'token=:token',
+            'order' => 'id DESC',
+            'params' => array('token' => $token)
+        ));
+        if($oResponse && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($oResponse->id))) {
+            $this->_endWithEditionMessage($since);
+        }
     }
-    $oSurvey = Survey::model()->findByPk($surveyid);
-    $token = App()->getRequest()->getParam('token');
-    if($srid == "new") {
-        // Done in beforeLoadResponse
-      return;
-    }
-    //~ $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeCode'),null,null,$this->settings['uniqueCodeCode']['default']);
-    $accesscode = App()->getRequest()->getQuery('code');
-    $editAllowed = false;
-    if($srid && $accesscode && $this->_getIsActivated('uniqueCodeAccess',$surveyid)) {
-      $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
-      if($responseLink && $responseLink->accesscode == $accesscode) {
-          $editAllowed = true;
-      }
-      if(!$responseLink) {
-            throw new CHttpException(404,$this->gT("Sorry, this response didn't exist."));
-      }
-      if($responseLink && $responseLink->accesscode != $accesscode) {
-            throw new CHttpException(401,$this->gT("Sorry, this access code is invalid."));
-      }
-    }
-    if(!$editAllowed && $this->_getIsActivated('allowToken',$surveyid) && !$oSurvey->getIsAnonymized()) {
-      $editAllowed = true;
-    }
-    if(!$editAllowed && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
-      $editAllowed = true;
-    }
-    
-    if(!$editAllowed) {
-        throw new CHttpException(401,$this->gT("Sorry, something happen bad."));
-        return;
-    }
+    /* @todo : control what happen with useleft > 1 and tokenanswerspersistence != "Y" */
 
-    $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
   }
 
+    /** @inheritdoc **/
+    public function beforeSurveyPage()
+    {
+        $surveyid = $this->getEvent()->get('surveyId');
+        Yii::app()->setConfig('surveysessiontime_limit',$this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']));
+        $disableMultiAccess = $this->_getCurrentSetting('disableMultiAccess',$surveyid);
+        /* For token : @todo in beforeReloadReponse */
+        /* @todo : delete surveySession is save or clearall action */
+        if($disableMultiAccess && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid))) {
+            /* This one is done with current session : maybe allow to keep srid in session and reload it ? */
+            $this->saveCurrentSrid($surveyid);
+            killSurveySession($surveyid);
+            $this->_endWithEditionMessage($since,array(
+                'comment' => $this->gT('We save your current session, you can try to reload the survey in some minutes'),
+                'class'=>'alert alert-info',
+            ));
+        }
+        $srid = App()->getRequest()->getQuery('srid');
+        if(!$srid && $disableMultiAccess) {
+            /* Always save current srid if needed , only reload can disable this */
+            \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid);
+            return;
+        }
+        $oSurvey = Survey::model()->findByPk($surveyid);
+        $token = App()->getRequest()->getParam('token');
+        if($srid == "new") {
+            // Done in beforeLoadResponse
+          return;
+        }
+        if(!$srid) {
+            $srid = $this->getCurrentSrid($surveyid);
+        }
+        if(!$srid) {
+            return;
+        }
+        //~ $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeCode'),null,null,$this->settings['uniqueCodeCode']['default']);
+        $accesscode = App()->getRequest()->getQuery('code');
+        $editAllowed = false;
+        if($srid && $accesscode && $this->_getIsActivated('uniqueCodeAccess',$surveyid)) {
+            $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
+            if($responseLink && $responseLink->accesscode == $accesscode) {
+                $editAllowed = true;
+            }
+            if(!$responseLink) {
+                throw new CHttpException(404,$this->gT("Sorry, this response didn't exist."));
+            }
+            if($responseLink && $responseLink->accesscode != $accesscode) {
+                throw new CHttpException(401,$this->gT("Sorry, this access code is invalid."));
+            }
+        }
+        if(!$editAllowed && $this->_getIsActivated('allowToken',$surveyid) && !$oSurvey->getIsAnonymized()) {
+            $editAllowed = true;
+        }
+        if(!$editAllowed && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
+            $editAllowed = true;
+        }
+
+        if(!$editAllowed) {
+            throw new CHttpException(401,$this->gT("Sorry, something happen bad."));
+            return;
+        }
+        if($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
+            $this->_endWithEditionMessage($since);
+        }
+        $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
+  }
+
+    /**
+     * Delete SurveySession for this event srid
+     */
+    public function deleteSurveySession()
+    {
+        $surveyId= $this->getEvent()->get('surveyId');
+        $responseId= $this->getEvent()->get('responseId');
+        \reloadAnyResponse\models\surveySession::model()->deleteByPk(array('sid'=>$surveyId,'srid'=>$responseId));
+    }
   /**
    * Get boolean value for setting activation
    * @param string existing $setting
@@ -296,22 +383,32 @@ class reloadAnyResponse extends PluginBase {
     }
     return (bool) $activation;
   }
-  /**
-   * Create needed DB
-   * @return viod
-   */
-  private function _createDb()
-  {
-    if (!$this->api->tableExists($this, 'responseLink'))
+    /**
+    * Create needed DB
+    * @return void
+    */
+    private function _createDb()
     {
-      $this->api->createTable($this, 'responseLink', array(
-          'sid'=>'int',
-          'srid'=>'int',
-          'token'=>'text',
-          'accesscode'=>'text',
-      ));
+        if (!$this->api->tableExists($this, 'responseLink'))
+        {
+            $this->api->createTable($this, 'responseLink', array(
+                'sid'=>'int',
+                'srid'=>'int',
+                'token'=>'text',
+                'accesscode'=>'text',
+            ));
+        }
+        if (!$this->api->tableExists($this, 'surveySession'))
+        {
+            $this->api->createTable($this, 'surveySession', array(
+                'sid' => 'int',
+                'srid' => 'int',
+                'token' => 'string(55)',
+                'session' => 'text',
+                'lastaction' => 'datetime'
+            ));
+        }
     }
-  }
 
   /**
    * Add needed alias and put it in autoloader
@@ -320,6 +417,7 @@ class reloadAnyResponse extends PluginBase {
   private function _setConfig()
   {
     Yii::setPathOfAlias(get_class($this), dirname(__FILE__));
+    $this->_createDb();
   }
 
   /**
@@ -431,5 +529,81 @@ class reloadAnyResponse extends PluginBase {
     parent::log($message, $level);
     Yii::log($message, $level,'application.plugins.reloadAnyResponse.'.$logDetail);
   }
-  
+
+    /**
+     * Save current srid if exist in specific session
+     * @return void
+     */
+    public function saveCurrentSrid($surveyId)
+    {
+        $currentSrid = isset($_SESSION['survey_'.$surveyId]['srid']) ? $_SESSION['survey_'.$surveyId]['srid'] : null;
+        if(!$currentSrid) {
+            return;
+        }
+        $sessionCurrentSrid = Yii::app()->session['reloadAnyResponsecurrentSrid'];
+        if(empty($sessionCurrentSrid)) {
+            $sessionCurrentSrid = array();
+        }
+        $sessionCurrentSrid[$surveyId] = $currentSrid;
+        Yii::app()->session['reloadAnyResponsecurrentSrid'] = $sessionCurrentSrid[$surveyId];
+    }
+
+    /**
+     * Get current srid if exist in specific session
+     * @return integer|null
+     */
+    public function getCurrentSrid($surveyId)
+    {
+        $sessionCurrentSrid = Yii::app()->session['reloadAnyResponsecurrentSrid'];
+        if(empty($sessionCurrentSrid) || empty($sessionCurrentSrid[$surveyId])) {
+            return;
+        }
+        return $sessionCurrentSrid[$surveyId];
+    }
+    /**
+     * Ending with the delay if renderMessage is available (if not : log as error …)
+     * @param float $since last edit
+     * @param string|string[] $comment array with 'comment' and 'class'
+     * @return void
+     */
+    private function _endWithEditionMessage($since,$comment=null)
+    {
+        if(!Yii::getPathOfAlias('renderMessage')) {
+            /* plugin log */
+            $this->log("You need to download and activate renderMessage plugin for disableMultiAccess",'error');
+            /* Yii log as vardump if debug>0 to be shown to user (with red part) */
+            Yii::log("reloadAnyReponse plugin : You need to download and activate renderMessage plugin for disableMultiAccess", 'error', 'vardump');
+            return;
+        }
+        $message = CHtml::tag("div",array("class"=>'alert alert-danger'),sprintf($this->gT("Sorry, someone changed these answers to the questionnaire a short time ago. The last action was made less than %s minutes ago."),ceil($since)));
+        if($comment) {
+            if(is_string($comment)) {
+                $comment = array(
+                    'comment'=> $comment,
+                    'class'=>'alert alert-info',
+                );
+            }
+            $message .= CHtml::tag("div",array("class"=>$comment['class']),$comment);
+        }
+        \renderMessage\messageHelper::renderContent($message);
+
+    }
+
+    /**
+     * Get current setting for current survey (use empty string as null value)
+     * @param string setting to get
+     * @param integer survey id
+     * @return string|array|null
+     */
+    private function _getCurrentSetting($setting,$surveyId = null)
+    {
+        if($surveyId) {
+            $value = $this->get($setting,'Survey',$surveyId,'');
+            if($value !== '') {
+                return $value;
+            }
+        }
+        $default = (isset($this->settings[$setting]['default'])) ? $this->settings[$setting]['default'] : null;
+        return $this->get($setting,null,null,$default);
+    }
 }
