@@ -1,0 +1,56 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: reloadAnyResponse\n"
+"POT-Creation-Date: 2018-04-30 08:59+0200\n"
+"PO-Revision-Date: 2018-04-30 09:02+0200\n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.0.6\n"
+"X-Poedit-Basepath: ..\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"X-Poedit-KeywordsList: gT\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"Last-Translator: Denis Chenu <contact@sondages.pro>\n"
+"Language: fr\n"
+"X-Poedit-SearchPath-0: .\n"
+"X-Poedit-SearchPathExcluded-0: locale\n"
+
+#: reloadAnyResponse.php:101 reloadAnyResponse.php:102
+#: reloadAnyResponse.php:103 reloadAnyResponse.php:112
+#: reloadAnyResponse.php:124 reloadAnyResponse.php:136
+msgid "Yes"
+msgstr "Oui"
+
+#: reloadAnyResponse.php:101 reloadAnyResponse.php:102
+#: reloadAnyResponse.php:103 reloadAnyResponse.php:113
+#: reloadAnyResponse.php:125 reloadAnyResponse.php:137
+msgid "No"
+msgstr "Non"
+
+#: reloadAnyResponse.php:110
+msgid "Allow admin user to reload any survey with response id."
+msgstr "Permettre aux administrateurs de charger n‘importe quel questionnaire avec l‘identifiant de réponse."
+
+#: reloadAnyResponse.php:116 reloadAnyResponse.php:128
+#: reloadAnyResponse.php:140
+#, php-format
+msgid "Use default (%s)"
+msgstr "Utiliser le défaut (%s)"
+
+#: reloadAnyResponse.php:122
+msgid "Create automatically code."
+msgstr "Créer le code automatiquement."
+
+#: reloadAnyResponse.php:134
+msgid "Allow entering unique code if exist."
+msgstr "Permettre d‘entrer le code unique si il existe."
+
+#: reloadAnyResponse.php:301
+msgid "Response not found."
+msgstr "Cette réponse n‘à pas était trouvée."
+
+#: reloadAnyResponse.php:307
+msgid "Access to this response need valid token."
+msgstr "L‘accès à cette réponse nécessite un code valide."
