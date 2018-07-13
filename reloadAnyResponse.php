@@ -155,37 +155,37 @@ class reloadAnyResponse extends PluginBase {
       'settings' => array(
         'allowAdminUser'=>array(
           'type'=>'select',
-          'label'=>$this->gT("Allow admin user to reload any survey with response id."),
+          'label'=>$this->_translate("Allow admin user to reload any survey with response id."),
           'options'=>array(
             1 =>gT("Yes"),
             0 =>gT("No"),
           ),
           'htmlOptions'=>array(
-            'empty' => CHtml::encode(sprintf($this->gT("Use default (%s)"),$allowAdminUserDefault)),
+            'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$allowAdminUserDefault)),
           ),
           'current'=>$this->get('allowAdminUser','Survey',$oEvent->get('survey'),"")
         ),
         'uniqueCodeCreate'=>array(
           'type'=>'select',
-          'label'=>$this->gT("Create automatically code."),
+          'label'=>$this->_translate("Create automatically code."),
           'options'=>array(
             1 =>gT("Yes"),
             0 =>gT("No"),
           ),
           'htmlOptions'=>array(
-            'empty' => CHtml::encode(sprintf($this->gT("Use default (%s)"),$uniqueCodeCreateDefault)),
+            'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$uniqueCodeCreateDefault)),
           ),
           'current'=>$this->get('uniqueCodeCreate','Survey',$oEvent->get('survey'),"")
         ),
         'uniqueCodeAccess'=>array(
           'type'=>'select',
-          'label'=>$this->gT("Allow entering unique code if exist."),
+          'label'=>$this->_translate("Allow entering unique code if exist."),
           'options'=>array(
             1 =>gT("Yes"),
             0 =>gT("No"),
           ),
           'htmlOptions'=>array(
-            'empty' => CHtml::encode(sprintf($this->gT("Use default (%s)"),$uniqueCodeAccessDefault)),
+            'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$uniqueCodeAccessDefault)),
           ),
           'current'=>$this->get('uniqueCodeAccess','Survey',$oEvent->get('survey'),"")
         ),
@@ -306,7 +306,7 @@ class reloadAnyResponse extends PluginBase {
             $this->saveCurrentSrid($surveyid);
             killSurveySession($surveyid);
             $this->_endWithEditionMessage($since,array(
-                'comment' => $this->gT('We save your current session, you can try to reload the survey in some minutes'),
+                'comment' => $this->_translate('We save your current session, you can try to reload the survey in some minutes'),
                 'class'=>'alert alert-info',
             ));
         }
@@ -337,10 +337,10 @@ class reloadAnyResponse extends PluginBase {
                 $editAllowed = true;
             }
             if(!$responseLink) {
-                throw new CHttpException(404,$this->gT("Sorry, this response didn't exist."));
+                throw new CHttpException(404,$this->_translate("Sorry, this response didn't exist."));
             }
             if($responseLink && $responseLink->accesscode != $accesscode) {
-                throw new CHttpException(401,$this->gT("Sorry, this access code is invalid."));
+                throw new CHttpException(401,$this->_translate("Sorry, this access code is invalid."));
             }
         }
         if(!$editAllowed && $this->_getIsActivated('allowToken',$surveyid) && !$oSurvey->getIsAnonymized()) {
@@ -351,7 +351,7 @@ class reloadAnyResponse extends PluginBase {
         }
 
         if(!$editAllowed) {
-            throw new CHttpException(401,$this->gT("Sorry, something happen bad."));
+            throw new CHttpException(401,$this->_translate("Sorry, something happen bad."));
             return;
         }
         if($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
@@ -435,13 +435,13 @@ class reloadAnyResponse extends PluginBase {
     }
     $oResponse = SurveyDynamic::model($surveyid)->find("id = :srid",array(':srid'=>$srid));
     if(!$oResponse) {
-      throw new CHttpException(404, $this->gT('Response not found.'));
+      throw new CHttpException(404, $this->_translate('Response not found.'));
     }
     $oSurvey = Survey::model()->findByPk($surveyid);
     // Validate token
     if(!Permission::model()->hasSurveyPermission($surveyid,'response','update') && $oResponse->token) {
       if($oResponse->token != $token) {
-        throw new CHttpException(401, $this->gT('Access to this response need valid token.'));
+        throw new CHttpException(401, $this->_translate('Access to this response need valid token.'));
       }
     }
     killSurveySession($surveyid); // Is this needed ?
@@ -575,7 +575,7 @@ class reloadAnyResponse extends PluginBase {
             Yii::log("reloadAnyReponse plugin : You need to download and activate renderMessage plugin for disableMultiAccess", 'error', 'vardump');
             return;
         }
-        $message = CHtml::tag("div",array("class"=>'alert alert-danger'),sprintf($this->gT("Sorry, someone changed these answers to the questionnaire a short time ago. The last action was made less than %s minutes ago."),ceil($since)));
+        $message = CHtml::tag("div",array("class"=>'alert alert-danger'),sprintf($this->_translate("Sorry, someone changed these answers to the questionnaire a short time ago. The last action was made less than %s minutes ago."),ceil($since)));
         if($comment) {
             if(is_string($comment)) {
                 $comment = array(
@@ -606,4 +606,32 @@ class reloadAnyResponse extends PluginBase {
         $default = (isset($this->settings[$setting]['default'])) ? $this->settings[$setting]['default'] : null;
         return $this->get($setting,null,null,$default);
     }
+
+    /**
+     * get translation
+     * @param string
+     * @return string
+     */
+    private function _translate($string){
+        return Yii::t('',$string,array(),get_class($this));
+    }
+
+    /**
+     * Add this translation just after loaded all plugins
+     * @see event afterPluginLoad
+     */
+    public function afterPluginLoad(){
+        // messageSource for this plugin:
+        $messageSource=array(
+            'class' => 'CGettextMessageSource',
+            'cacheID' => get_class($this).'Lang',
+            'cachingDuration'=>3600,
+            'forceTranslation' => true,
+            'useMoFile' => true,
+            'basePath' => __DIR__ . DIRECTORY_SEPARATOR.'locale',
+            'catalog'=>'messages',// default from Yii
+        );
+        Yii::app()->setComponent(get_class($this),$messageSource);
+    }
+
 }
