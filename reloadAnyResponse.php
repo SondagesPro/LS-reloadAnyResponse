@@ -41,7 +41,7 @@ class reloadAnyResponse extends PluginBase {
         'label'=>"Allow admin user to reload any survey with response id.",
         'default'=>1,
     ),
-    'allowToken' => array(
+    'allowTokenUser' => array(
         'type'=>'checkbox',
         'htmlOptions'=>array(
             'value'=>1,
@@ -77,7 +77,7 @@ class reloadAnyResponse extends PluginBase {
     ),
     'multiAccessTime'=>array(
         'type'=>'int',
-        'label' => 'Time for disable multiple access (in minutes)',
+        'label' => 'Time for disable multiple access (in minutes) (config.php settings replace it of not exist)',
         'help' => 'Before save value or entering survey : test if someone else edit response in this last minutes. Disable save and show a message if yes. Set to empty disable system but then answer of user can be deleted by another user without any information…',
         'htmlOptions'=>array(
             'min'=>1,
@@ -147,6 +147,7 @@ class reloadAnyResponse extends PluginBase {
     $oEvent = $this->event;
     /* currentDefault translation */
     $allowAdminUserDefault = $this->get('allowAdminUser',null,null,$this->settings['allowAdminUser']['default']) ? gT('Yes') : gT('No');
+    $allowTokenDefault = $this->get('allowTokenUser',null,null,$this->settings['allowTokenUser']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeCreateDefault = $this->get('uniqueCodeCreate',null,null,$this->settings['uniqueCodeCreate']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeAccessDefault = $this->get('uniqueCodeAccess',null,null,$this->settings['uniqueCodeAccess']['default']) ? gT('Yes') : gT('No');
 
@@ -164,6 +165,19 @@ class reloadAnyResponse extends PluginBase {
             'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$allowAdminUserDefault)),
           ),
           'current'=>$this->get('allowAdminUser','Survey',$oEvent->get('survey'),"")
+        ),
+        'allowTokenUser'=>array(
+          'type' => 'select',
+          'label' => $this->_translate("Allow token user to create or reload response."),
+          'help' => $this->_translate("Related to “Enable token-based response persistence” and “Allow multiple responses or update responses” survey settings."),
+          'options'=>array(
+            1 =>gT("Yes"),
+            0 =>gT("No"),
+          ),
+          'htmlOptions'=>array(
+            'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$allowTokenDefault)),
+          ),
+          'current'=>$this->get('allowTokenUser','Survey',$oEvent->get('survey'),"")
         ),
         'uniqueCodeCreate'=>array(
           'type'=>'select',
@@ -267,27 +281,27 @@ class reloadAnyResponse extends PluginBase {
   public function beforeLoadResponse()
   {
     $srid = App()->getRequest()->getQuery('srid');
-    if($srid=='new') {
-        $surveyid = $this->getEvent()->get('surveyId');
-        $token = App()->getRequest()->getParam('token');
+    $surveyId = $this->getEvent()->get('surveyId');
+    $token = App()->getRequest()->getParam('token');
+    if($srid=='new' && $token && $this->_getIsActivated('allowTokenUser',$surveyid)) {
         $this->getEvent()->set('response',
-            $this->_createNewResponse($surveyid,$token)
+            $this->_createNewResponse($surveyId,$token)
         );
     }
     /* control multi access to token with token and allow edit reponse */
-    $surveyId = $this->getEvent()->get('surveyId');
     $oSurvey = Survey::model()->findByPk($surveyId);
     if($oSurvey && $oSurvey->alloweditaftercompletion == "Y" && $oSurvey->tokenanswerspersistence == "Y") {
         /* Get like limesurvey (in this situation) : get the last srid with this token (without plugin …) */
-        $oResponse = Response::model($surveyid)->find(array(
+        $oResponse = Response::model($surveyId)->find(array(
             'select' => 'id',
             'condition' => 'token=:token',
             'order' => 'id DESC',
             'params' => array('token' => $token)
         ));
-        if($oResponse && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($oResponse->id))) {
+        if($this->_getCurrentSetting('disableMultiAccess',$surveyId) && $oResponse && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyId,$oResponse->id))) {
             $this->_endWithEditionMessage($since);
         }
+        \reloadAnyResponse\models\surveySession::saveSessionTime($surveyId,$oResponse->id);
     }
     /* @todo : control what happen with useleft > 1 and tokenanswerspersistence != "Y" */
 
@@ -296,8 +310,13 @@ class reloadAnyResponse extends PluginBase {
     /** @inheritdoc **/
     public function beforeSurveyPage()
     {
+        /* Save current session Id to allow same user to reload survey in same browser */
+        /* resetAllSessionVariables regenerate session id */
+        Yii::app()->setConfig('previousSessionId',Yii::app()->getSession()->getSessionID());
         $surveyid = $this->getEvent()->get('surveyId');
-        Yii::app()->setConfig('surveysessiontime_limit',$this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']));
+        if(!empty($this->get('multiAccessTime','Survey',$surveyid))) {
+            Yii::app()->setConfig('surveysessiontime_limit',$this->get('multiAccessTime','Survey',$surveyid));
+        }
         $disableMultiAccess = $this->_getCurrentSetting('disableMultiAccess',$surveyid);
         /* For token : @todo in beforeReloadReponse */
         /* @todo : delete surveySession is save or clearall action */
@@ -331,7 +350,7 @@ class reloadAnyResponse extends PluginBase {
         //~ $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeCode'),null,null,$this->settings['uniqueCodeCode']['default']);
         $accesscode = App()->getRequest()->getQuery('code');
         $editAllowed = false;
-        if($srid && $accesscode && $this->_getIsActivated('uniqueCodeAccess',$surveyid)) {
+        if($accesscode && $this->_getIsActivated('uniqueCodeAccess',$surveyid)) {
             $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
             if($responseLink && $responseLink->accesscode == $accesscode) {
                 $editAllowed = true;
@@ -343,7 +362,7 @@ class reloadAnyResponse extends PluginBase {
                 throw new CHttpException(401,$this->_translate("Sorry, this access code is invalid."));
             }
         }
-        if(!$editAllowed && $this->_getIsActivated('allowToken',$surveyid) && !$oSurvey->getIsAnonymized()) {
+        if(!$editAllowed && $this->_getIsActivated('allowTokenUser',$surveyid) && !$oSurvey->getIsAnonymized()) {
             $editAllowed = true;
         }
         if(!$editAllowed && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
@@ -411,13 +430,21 @@ class reloadAnyResponse extends PluginBase {
     }
 
   /**
-   * Add needed alias and put it in autoloader
+   * Add needed alias and put it in autoloader,
+   * add surveysessiontime_limit to global config
    * @return void
    */
   private function _setConfig()
   {
     Yii::setPathOfAlias(get_class($this), dirname(__FILE__));
     $this->_createDb();
+    if(!empty(Yii::app()->getConfig('surveysessiontime_limit')) ) {
+        /* Allow to force surveysessiontime_limit in config.php , to do : show it to admin */
+        Yii::app()->setConfig('surveysessiontimeDisable',true);
+    }
+    if(empty(Yii::app()->getConfig('surveysessiontime_limit')) ) {
+        Yii::app()->setConfig('surveysessiontime_limit',$this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']));
+    }
   }
 
   /**
@@ -493,7 +520,7 @@ class reloadAnyResponse extends PluginBase {
     if(!(
       ($this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','create'))
       ||
-      ($this->_getIsActivated('allowToken',$surveyid))
+      ($this->_getIsActivated('allowTokenUser',$surveyid))
       )) {
       // Disable here
       $this->log("Try to create a new reponse with token but without right",'warning');

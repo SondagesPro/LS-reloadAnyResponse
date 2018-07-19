@@ -95,12 +95,17 @@ class surveySession extends CActiveRecord
         }
         $delay = self::_getSessionTimeLimit();
         $maxDateTime=date('Y-m-d H:i:s', strtotime("{$delay} minutes ago"));
-        self::model()->deleteAll("sid = :sid and srid = :srid and lastaction < :lastaction",
-            array(":sid"=>$sid,":srid"=>$srid,":lastaction"=>$maxDateTime)
+        self::model()->deleteAll("sid = :sid and lastaction < :lastaction",
+            array(":sid"=>$sid,":lastaction"=>$maxDateTime)
         );
         $oSessionSurvey = self::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
         if($oSessionSurvey && $oSessionSurvey->session != Yii::app()->getSession()->getSessionID()) {
-            
+            if($oSessionSurvey->session === Yii::app()->getConfig('previousSessionId')) {
+                $oSessionSurvey->session = Yii::app()->getSession()->getSessionID();
+                $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
+                $oSessionSurvey->save();
+                return;
+            }
             $lastaction = strtotime($oSessionSurvey->lastaction);
             $now = strtotime("now");
             $sinceTime = abs($lastaction - $now) / 60;
