@@ -312,7 +312,19 @@ class reloadAnyResponse extends PluginBase {
     {
         /* Save current session Id to allow same user to reload survey in same browser */
         /* resetAllSessionVariables regenerate session id */
-        Yii::app()->setConfig('previousSessionId',Yii::app()->getSession()->getSessionID());
+        /* Keep previous session id, if user reload start url it reset the sessionId, need to leav access */
+        $previousSessionId = Yii::app()->session['previousSessionId'];
+        if(empty($previousSessionId)) {
+            $previousSessionId = array(
+                Yii::app()->getSession()->getSessionID(),
+                Yii::app()->getSession()->getSessionID(),
+            );
+        }
+        $previousSessionId = array(
+            Yii::app()->getSession()->getSessionID(),
+            $previousSessionId[0],
+        );
+        Yii::app()->session['previousSessionId'] = $previousSessionId;
         $surveyid = $this->getEvent()->get('surveyId');
         if(!empty($this->get('multiAccessTime','Survey',$surveyid))) {
             Yii::app()->setConfig('surveysessiontime_limit',$this->get('multiAccessTime','Survey',$surveyid));

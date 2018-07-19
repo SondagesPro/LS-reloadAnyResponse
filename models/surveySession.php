@@ -100,7 +100,8 @@ class surveySession extends CActiveRecord
         );
         $oSessionSurvey = self::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
         if($oSessionSurvey && $oSessionSurvey->session != Yii::app()->getSession()->getSessionID()) {
-            if($oSessionSurvey->session === Yii::app()->getConfig('previousSessionId')) {
+            $previousSessionId = Yii::app()->session['previousSessionId'];
+            if(isset($previousSessionId[1]) && $oSessionSurvey->session === $previousSessionId[1]) {
                 $oSessionSurvey->session = Yii::app()->getSession()->getSessionID();
                 $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
                 $oSessionSurvey->save();
