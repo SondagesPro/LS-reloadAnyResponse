@@ -374,15 +374,15 @@ class reloadAnyResponse extends PluginBase {
                 throw new CHttpException(401,$this->_translate("Sorry, this access code is invalid."));
             }
         }
-        if(!$editAllowed && $this->_getIsActivated('allowTokenUser',$surveyid) && !$oSurvey->getIsAnonymized()) {
+        if(!$editAllowed && $this->_getIsActivated('allowTokenUser',$surveyid) && $this->_accessibleWithToken($oSurvey)) {
             $editAllowed = true;
         }
         if(!$editAllowed && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
             $editAllowed = true;
         }
-
+        
         if(!$editAllowed) {
-            throw new CHttpException(401,$this->_translate("Sorry, something happen bad."));
+            $this->log("srid used in url without right to reload");
             return;
         }
         if($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
@@ -599,6 +599,18 @@ class reloadAnyResponse extends PluginBase {
         }
         return $sessionCurrentSrid[$surveyId];
     }
+
+    /**
+     * Did this survey have token with reload available
+     * @var \Survey
+     * @return boolean
+     */
+    private function _accessibleWithToken($oSurvey)
+    {
+        Yii::import('application.helpers.common_helper', true);
+        return $oSurvey->anonymized != "Y" && tableExists("{{tokens_".$oSurvey->sid."}}");
+    }
+
     /**
      * Ending with the delay if renderMessage is available (if not : log as error …)
      * @param float $since last edit
