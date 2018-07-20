@@ -156,7 +156,7 @@ class reloadAnyResponse extends PluginBase {
       'settings' => array(
         'allowAdminUser'=>array(
           'type'=>'select',
-          'label'=>$this->_translate("Allow admin user to reload any survey with response id."),
+          'label'=>$this->_translate("Allow admin user to reload any response with response id."),
           'options'=>array(
             1 =>gT("Yes"),
             0 =>gT("No"),
@@ -168,7 +168,7 @@ class reloadAnyResponse extends PluginBase {
         ),
         'allowTokenUser'=>array(
           'type' => 'select',
-          'label' => $this->_translate("Allow token user to create or reload response."),
+          'label' => $this->_translate("Allow participant with token to create or reload responses."),
           'help' => $this->_translate("Related to “Enable token-based response persistence” and “Allow multiple responses or update responses” survey settings."),
           'options'=>array(
             1 =>gT("Yes"),
@@ -181,7 +181,7 @@ class reloadAnyResponse extends PluginBase {
         ),
         'uniqueCodeCreate'=>array(
           'type'=>'select',
-          'label'=>$this->_translate("Create automatically code."),
+          'label'=>$this->_translate("Create unique code automatically."),
           'options'=>array(
             1 =>gT("Yes"),
             0 =>gT("No"),
@@ -193,7 +193,7 @@ class reloadAnyResponse extends PluginBase {
         ),
         'uniqueCodeAccess'=>array(
           'type'=>'select',
-          'label'=>$this->_translate("Allow entering unique code if exist."),
+          'label'=>$this->_translate("Allow using unique code if exist."),
           'options'=>array(
             1 =>gT("Yes"),
             0 =>gT("No"),
@@ -337,7 +337,7 @@ class reloadAnyResponse extends PluginBase {
             $this->saveCurrentSrid($surveyid);
             killSurveySession($surveyid);
             $this->_endWithEditionMessage($since,array(
-                'comment' => $this->_translate('We save your current session, you can try to reload the survey in some minutes'),
+                'comment' => $this->_translate('We save your current session, you can try to reload the survey in some minutes.'),
                 'class'=>'alert alert-info',
             ));
         }
@@ -480,7 +480,7 @@ class reloadAnyResponse extends PluginBase {
     // Validate token
     if(!Permission::model()->hasSurveyPermission($surveyid,'response','update') && $oResponse->token) {
       if($oResponse->token != $token) {
-        throw new CHttpException(401, $this->_translate('Access to this response need valid token.'));
+        throw new CHttpException(401, $this->_translate('Access to this response need a valid token.'));
       }
     }
     killSurveySession($surveyid); // Is this needed ?
@@ -535,7 +535,7 @@ class reloadAnyResponse extends PluginBase {
       ($this->_getIsActivated('allowTokenUser',$surveyid))
       )) {
       // Disable here
-      $this->log("Try to create a new reponse with token but without right",'warning');
+      $this->log("Try to create a new reponse with token but without valid rights",'warning');
       return;
     }
     $oToken = Token::model($surveyid)->findByAttributes(array('token' => $token));
@@ -614,7 +614,7 @@ class reloadAnyResponse extends PluginBase {
             Yii::log("reloadAnyReponse plugin : You need to download and activate renderMessage plugin for disableMultiAccess", 'error', 'vardump');
             return;
         }
-        $message = CHtml::tag("div",array("class"=>'alert alert-danger'),sprintf($this->_translate("Sorry, someone changed these answers to the questionnaire a short time ago. The last action was made less than %s minutes ago."),ceil($since)));
+        $message = CHtml::tag("div",array("class"=>'alert alert-danger'),sprintf($this->_translate("Sorry, someone update this response to the questionnaire a short time ago. The last action was made less than %s minutes ago."),ceil($since)));
         if($comment) {
             if(is_string($comment)) {
                 $comment = array(
