@@ -1,56 +1,96 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: reloadAnyResponse\n"
-"POT-Creation-Date: 2018-04-30 08:59+0200\n"
-"PO-Revision-Date: 2018-04-30 09:02+0200\n"
+"POT-Creation-Date: 2018-07-20 09:03+0200\n"
+"PO-Revision-Date: 2018-07-20 09:11+0200\n"
+"Last-Translator: Denis Chenu <contact@sondages.pro>\n"
 "Language-Team: \n"
+"Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 2.0.6\n"
+"X-Generator: Poedit 2.0.8\n"
 "X-Poedit-Basepath: ..\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "X-Poedit-KeywordsList: gT\n"
 "X-Poedit-SourceCharset: UTF-8\n"
-"Last-Translator: Denis Chenu <contact@sondages.pro>\n"
-"Language: fr\n"
 "X-Poedit-SearchPath-0: .\n"
 "X-Poedit-SearchPathExcluded-0: locale\n"
 
-#: reloadAnyResponse.php:101 reloadAnyResponse.php:102
-#: reloadAnyResponse.php:103 reloadAnyResponse.php:112
-#: reloadAnyResponse.php:124 reloadAnyResponse.php:136
-msgid "Yes"
-msgstr "Oui"
+#: reloadAnyResponse.php:159
+msgid "Allow admin user to reload any response with response id."
+msgstr ""
+"Permettre aux administrateurs de charger n‘importe quelle réponse avec "
+"l‘identifiant de réponse."
 
-#: reloadAnyResponse.php:101 reloadAnyResponse.php:102
-#: reloadAnyResponse.php:103 reloadAnyResponse.php:113
-#: reloadAnyResponse.php:125 reloadAnyResponse.php:137
-msgid "No"
-msgstr "Non"
-
-#: reloadAnyResponse.php:110
-msgid "Allow admin user to reload any survey with response id."
-msgstr "Permettre aux administrateurs de charger n‘importe quel questionnaire avec l‘identifiant de réponse."
-
-#: reloadAnyResponse.php:116 reloadAnyResponse.php:128
-#: reloadAnyResponse.php:140
+#: reloadAnyResponse.php:165 reloadAnyResponse.php:178
+#: reloadAnyResponse.php:190 reloadAnyResponse.php:202
 #, php-format
 msgid "Use default (%s)"
 msgstr "Utiliser le défaut (%s)"
 
-#: reloadAnyResponse.php:122
-msgid "Create automatically code."
-msgstr "Créer le code automatiquement."
+#: reloadAnyResponse.php:171
+msgid "Allow participant with token to create or reload responses."
+msgstr ""
+"Permettre au participant avec un code d‘invitation de créer ou éditer "
+"leurs réponses."
 
-#: reloadAnyResponse.php:134
-msgid "Allow entering unique code if exist."
-msgstr "Permettre d‘entrer le code unique si il existe."
+#: reloadAnyResponse.php:172
+msgid ""
+"Related to “Enable token-based response persistence” and “Allow multiple "
+"responses or update responses” survey settings."
+msgstr ""
+"Lié à «Activer la persistance des réponses basée sur les codes "
+"d’invitation» et «Permettre les réponses multiples ou les mises à jour de "
+"réponses»"
 
-#: reloadAnyResponse.php:301
+#: reloadAnyResponse.php:184
+msgid "Create unique code automatically."
+msgstr "Créer le code unique automatiquement."
+
+#: reloadAnyResponse.php:196
+msgid "Allow using unique code if exist."
+msgstr "Permettre d‘utiliser le code unique si il existe."
+
+#: reloadAnyResponse.php:340
+msgid ""
+"We save your current session, you can try to reload the survey in some "
+"minutes."
+msgstr ""
+"Nous enregistrons votre session actuelle, vous pouvez réessayer de charger "
+"ce questionnaire dans quelques minutes."
+
+#: reloadAnyResponse.php:371
+msgid "Sorry, this response didn't exist."
+msgstr "Désolé, cette réponse n‘existe pas."
+
+#: reloadAnyResponse.php:374
+msgid "Sorry, this access code is invalid."
+msgstr "Désolé, ce code d‘accès est invalide."
+
+#: reloadAnyResponse.php:385
+msgid "Sorry, something happen bad."
+msgstr "Désolé, quelque-chose s‘est mal passé."
+
+#: reloadAnyResponse.php:477
 msgid "Response not found."
 msgstr "Cette réponse n‘à pas était trouvée."
 
-#: reloadAnyResponse.php:307
-msgid "Access to this response need valid token."
-msgstr "L‘accès à cette réponse nécessite un code valide."
+#: reloadAnyResponse.php:483
+msgid "Access to this response need a valid token."
+msgstr "L‘accès à cette réponse nécessite un code d‘invitation valide."
+
+#: reloadAnyResponse.php:617
+#, php-format
+msgid ""
+"Sorry, someone update this response to the questionnaire a short time ago. "
+"The last action was made less than %s minutes ago."
+msgstr ""
+"Désolé, quelqu‘un a mis à jour cette réponse il y a peu de temps. La "
+"dernière action a eu lieu il y a moins de %s minutes."
+
+#~ msgid "Yes"
+#~ msgstr "Oui"
+
+#~ msgid "No"
+#~ msgstr "Non"
