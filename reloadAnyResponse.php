@@ -150,6 +150,7 @@ class reloadAnyResponse extends PluginBase {
     $allowTokenDefault = $this->get('allowTokenUser',null,null,$this->settings['allowTokenUser']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeCreateDefault = $this->get('uniqueCodeCreate',null,null,$this->settings['uniqueCodeCreate']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeAccessDefault = $this->get('uniqueCodeAccess',null,null,$this->settings['uniqueCodeAccess']['default']) ? gT('Yes') : gT('No');
+    $multiAccessTimeDefault = $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) ? $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) : gT('Disable');
 
     $oEvent->set("surveysettings.{$this->id}", array(
       'name' => get_class($this),
@@ -202,6 +203,15 @@ class reloadAnyResponse extends PluginBase {
             'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$uniqueCodeAccessDefault)),
           ),
           'current'=>$this->get('uniqueCodeAccess','Survey',$oEvent->get('survey'),"")
+        ),
+        'multiAccessTime'=>array(
+          'type'=>'int',
+          'label'=>$this->_translate("Time for disable multiple access (in minutes)."),
+          'htmlOptions'=>array(
+            'min'=>0,
+            'placeholder' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$multiAccessTimeDefault)),
+          ),
+          'current'=>$this->get('multiAccessTime','Survey',$oEvent->get('survey'),"")
         ),
       ),
     ));
@@ -283,10 +293,9 @@ class reloadAnyResponse extends PluginBase {
     $srid = App()->getRequest()->getQuery('srid');
     $surveyId = $this->getEvent()->get('surveyId');
     $token = App()->getRequest()->getParam('token');
-    if($srid=='new' && $token && $this->_getIsActivated('allowTokenUser',$surveyid)) {
-        $this->getEvent()->set('response',
-            $this->_createNewResponse($surveyId,$token)
-        );
+    if($srid=='new' && $token && $this->_getIsActivated('allowTokenUser',$surveyId)) {
+        $this->getEvent()->set('response',false);
+        return;
     }
     /* control multi access to token with token and allow edit reponse */
     $oSurvey = Survey::model()->findByPk($surveyId);
@@ -326,10 +335,14 @@ class reloadAnyResponse extends PluginBase {
         );
         Yii::app()->session['previousSessionId'] = $previousSessionId;
         $surveyid = $this->getEvent()->get('surveyId');
-        if(!empty($this->get('multiAccessTime','Survey',$surveyid))) {
-            Yii::app()->setConfig('surveysessiontime_limit',$this->get('multiAccessTime','Survey',$surveyid));
+        $multiAccessTime = $this->_getCurrentSetting('multiAccessTime',$surveyid);
+        if($multiAccessTime !== '') {
+            Yii::app()->setConfig('surveysessiontime_limit',$multiAccessTime);
         }
         $disableMultiAccess = $this->_getCurrentSetting('disableMultiAccess',$surveyid);
+        if($multiAccessTime !== '0') {
+            $disableMultiAccess = false;
+        }
         /* For token : @todo in beforeReloadReponse */
         /* @todo : delete surveySession is save or clearall action */
         if($disableMultiAccess && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid))) {
@@ -388,6 +401,7 @@ class reloadAnyResponse extends PluginBase {
         if($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
             $this->_endWithEditionMessage($since);
         }
+        
         $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
   }
 
@@ -502,32 +516,31 @@ class reloadAnyResponse extends PluginBase {
     if (!empty($oResponse->submitdate)) {
         $_SESSION['survey_'.$surveyid]['maxstep'] = $_SESSION['survey_'.$surveyid]['totalsteps'];
     }
-
-    randomizationGroupsAndQuestions($surveyid);
-    initFieldArray($surveyid, $_SESSION['survey_'.$surveyid]['fieldmap']);
+    if(version_compare(Yii::app()->getConfig('versionnumber'),"3",">=")) {
+        randomizationGroupsAndQuestions($surveyid);
+        initFieldArray($surveyid, $_SESSION['survey_'.$surveyid]['fieldmap']);
+    }
     loadanswers();
   }
 
   /**
    * Create a new response for token
+   * @todo : validate if we need it or if it's a bug in LS version tested
    * @param int $surveyid
    * @param string $token
    * @return null|\Response
    */
   private function _createNewResponse($surveyid,$token) {
       $oSurvey = Survey::model()->findByPk($surveyid);
-      if(!$oSurvey->getHasTokensTable()) {
+      if($this->_accessibleWithToken($oSurvey)) {
         return;
       }
-      if($oSurvey->getIsAnonymized()) {
+      if($oSurvey->tokenanswerspersistence != "Y") {
         return;
       }
-      if(!$oSurvey->tokenanswerspersistence) {
-        return;
-      }
-      if(!$oSurvey->alloweditaftercompletion) {
-        return;
-      }
+      //~ if($oSurvey->alloweditaftercompletion != "Y") {
+        //~ return;
+      //~ }
     /* some control */
     if(!(
       ($this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','create'))
@@ -546,7 +559,9 @@ class reloadAnyResponse extends PluginBase {
     $oResponse->token = $oToken->token;
     $oResponse->startlanguage = Yii::app()->getLanguage();
     /* @todo generate if not set */
-    $oResponse->seed = isset($_SESSION['survey_'.$surveyid]['startingValues']['seed']) ? $_SESSION['survey_'.$surveyid]['startingValues']['seed'] : null;
+    if(version_compare(Yii::app()->getConfig('versionnumber'),"3",">=") ) {
+        $oResponse->seed = isset($_SESSION['survey_'.$surveyid]['startingValues']['seed']) ? $_SESSION['survey_'.$surveyid]['startingValues']['seed'] : null;
+    }
     $oResponse->lastpage=-1;
     if($oSurvey->datestamp == 'Y') {
         $date = dateShift(date("Y-m-d H:i:s"), "Y-m-d H:i:s", Yii::app()->getConfig('timeadjust'));

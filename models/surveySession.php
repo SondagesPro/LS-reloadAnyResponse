@@ -25,6 +25,20 @@ class surveySession extends CActiveRecord
     public static function model($className=__CLASS__) {
         return parent::model($className);
     }
+
+    /**
+     * init to set default
+     *
+     */
+    public function init()
+    {
+        $this->sid = 0;
+        $this->srid = 0;
+        $this->token = "";
+        $this->session = "";
+        $this->lastaction = null;
+    }
+
     /** @inheritdoc */
     public function tableName()
     {
@@ -36,6 +50,12 @@ class surveySession extends CActiveRecord
     {
         return array('sid', 'srid');
     }
+
+    /** @inheritdoc */
+    /** @todo */
+    //~ public function rules()
+    //~ {
+    //~ }
 
     /**
      * Return (or create) self
@@ -64,7 +84,7 @@ class surveySession extends CActiveRecord
                 $token = $oResponse->token;
             }
         }
-        $oSessionSurvey = self::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
+        $oSessionSurvey = self::model()->find("sid = :sid and srid = :srid",array(':sid'=>$sid,':srid'=>$srid));
         if(!$oSessionSurvey) {
             $oSessionSurvey = new self;
             $oSessionSurvey->sid = $sid;
@@ -94,6 +114,9 @@ class surveySession extends CActiveRecord
             return;
         }
         $delay = self::_getSessionTimeLimit();
+        if($delay === "0") {
+            return null;
+        }
         $maxDateTime=date('Y-m-d H:i:s', strtotime("{$delay} minutes ago"));
         self::model()->deleteAll("sid = :sid and lastaction < :lastaction",
             array(":sid"=>$sid,":lastaction"=>$maxDateTime)
@@ -120,9 +143,6 @@ class surveySession extends CActiveRecord
      */
     private static function  _getSessionTimeLimit() {
         $sessionTimeLimit = intval(Yii::app()->getConfig('surveysessiontime_limit',self::maxSessionTime));
-        if(!$sessionTimeLimit) {
-            $sessionTimeLimit = self::maxSessionTime;
-        }
         return $sessionTimeLimit;
     }
 }
