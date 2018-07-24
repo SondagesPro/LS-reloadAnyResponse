@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.5.1
+ * @version 0.5.2
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ class reloadAnyResponse extends PluginBase {
   static protected $description = 'New class and function allowing to reload any survey.';
   static protected $name = 'reloadAnyResponse';
 
+  const KeepSessionNumber = 15;
   /**
    * @var array[] the settings
    */
@@ -324,15 +325,12 @@ class reloadAnyResponse extends PluginBase {
         /* Keep previous session id, if user reload start url it reset the sessionId, need to leav access */
         $previousSessionId = Yii::app()->session['previousSessionId'];
         if(empty($previousSessionId)) {
-            $previousSessionId = array(
-                Yii::app()->getSession()->getSessionID(),
-                Yii::app()->getSession()->getSessionID(),
-            );
+            $previousSessionId = array();
         }
-        $previousSessionId = array(
-            Yii::app()->getSession()->getSessionID(),
-            $previousSessionId[0],
-        );
+        $previousSessionId[] = Yii::app()->getSession()->getSessionID();
+        if(count($previousSessionId) > self::KeepSessionNumber ) {
+            array_shift($previousSessionId);
+        }
         Yii::app()->session['previousSessionId'] = $previousSessionId;
         $surveyid = $this->getEvent()->get('surveyId');
         $multiAccessTime = $this->_getCurrentSetting('multiAccessTime',$surveyid);

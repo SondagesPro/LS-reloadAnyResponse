@@ -122,20 +122,29 @@ class surveySession extends CActiveRecord
             array(":sid"=>$sid,":lastaction"=>$maxDateTime)
         );
         $oSessionSurvey = self::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
-        if($oSessionSurvey && $oSessionSurvey->session != Yii::app()->getSession()->getSessionID()) {
-            $previousSessionId = Yii::app()->session['previousSessionId'];
-            if(isset($previousSessionId[1]) && $oSessionSurvey->session === $previousSessionId[1]) {
-                $oSessionSurvey->session = Yii::app()->getSession()->getSessionID();
-                $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
-                $oSessionSurvey->save();
-                return;
-            }
-            $lastaction = strtotime($oSessionSurvey->lastaction);
-            $now = strtotime("now");
-            $sinceTime = abs($lastaction - $now) / 60;
-            return $sinceTime;
+        /* No current session : can quit */
+        if(!$oSessionSurvey) {
+            return null;
         }
-        return null;
+        /* Same session : save time and quit */
+        if($oSessionSurvey->session == Yii::app()->getSession()->getSessionID()) {
+            $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
+            $oSessionSurvey->save();
+            return null;
+        }
+        /* In previous sessions : save time and quit */
+        $previousSessionId = (array) Yii::app()->session['previousSessionId'];
+        if(in_array($oSessionSurvey->session,$previousSessionId)) {
+            $oSessionSurvey->session = Yii::app()->getSession()->getSessionID();
+            $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
+            $oSessionSurvey->save();
+            return null;
+        }
+        $lastaction = strtotime($oSessionSurvey->lastaction);
+        $now = strtotime("now");
+        $sinceTime = abs($lastaction - $now) / 60;
+        return $sinceTime;
+
     }
 
     /**
