@@ -1,15 +1,15 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: reloadAnyResponse\n"
-"POT-Creation-Date: 2018-07-20 09:03+0200\n"
-"PO-Revision-Date: 2018-07-20 09:11+0200\n"
+"POT-Creation-Date: 2018-07-26 15:39+0200\n"
+"PO-Revision-Date: 2018-07-26 15:43+0200\n"
 "Last-Translator: Denis Chenu <contact@sondages.pro>\n"
 "Language-Team: \n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 2.0.8\n"
+"X-Generator: Poedit 2.0.9\n"
 "X-Poedit-Basepath: ..\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "X-Poedit-KeywordsList: gT\n"
@@ -17,42 +17,46 @@ msgstr ""
 "X-Poedit-SearchPath-0: .\n"
 "X-Poedit-SearchPathExcluded-0: locale\n"
 
-#: reloadAnyResponse.php:159
+#: reloadAnyResponse.php:161
 msgid "Allow admin user to reload any response with response id."
 msgstr ""
 "Permettre aux administrateurs de charger n‘importe quelle réponse avec "
 "l‘identifiant de réponse."
 
-#: reloadAnyResponse.php:165 reloadAnyResponse.php:178
-#: reloadAnyResponse.php:190 reloadAnyResponse.php:202
+#: reloadAnyResponse.php:167 reloadAnyResponse.php:180
+#: reloadAnyResponse.php:192 reloadAnyResponse.php:204
+#: reloadAnyResponse.php:213
 #, php-format
 msgid "Use default (%s)"
 msgstr "Utiliser le défaut (%s)"
 
-#: reloadAnyResponse.php:171
+#: reloadAnyResponse.php:173
 msgid "Allow participant with token to create or reload responses."
 msgstr ""
-"Permettre au participant avec un code d‘invitation de créer ou éditer "
-"leurs réponses."
+"Permettre au participant avec un code d‘invitation de créer ou éditer leurs "
+"réponses."
 
-#: reloadAnyResponse.php:172
+#: reloadAnyResponse.php:174
 msgid ""
 "Related to “Enable token-based response persistence” and “Allow multiple "
 "responses or update responses” survey settings."
 msgstr ""
-"Lié à «Activer la persistance des réponses basée sur les codes "
-"d’invitation» et «Permettre les réponses multiples ou les mises à jour de "
-"réponses»"
+"Lié à «Activer la persistance des réponses basée sur les codes d’invitation» "
+"et «Permettre les réponses multiples ou les mises à jour de réponses»"
 
-#: reloadAnyResponse.php:184
+#: reloadAnyResponse.php:186
 msgid "Create unique code automatically."
 msgstr "Créer le code unique automatiquement."
 
-#: reloadAnyResponse.php:196
+#: reloadAnyResponse.php:198
 msgid "Allow using unique code if exist."
 msgstr "Permettre d‘utiliser le code unique si il existe."
 
-#: reloadAnyResponse.php:340
+#: reloadAnyResponse.php:210
+msgid "Time for disable multiple access (in minutes)."
+msgstr "Délais de protection des accès multiples (en minutes)."
+
+#: reloadAnyResponse.php:351
 msgid ""
 "We save your current session, you can try to reload the survey in some "
 "minutes."
@@ -60,27 +64,23 @@ msgstr ""
 "Nous enregistrons votre session actuelle, vous pouvez réessayer de charger "
 "ce questionnaire dans quelques minutes."
 
-#: reloadAnyResponse.php:371
+#: reloadAnyResponse.php:382
 msgid "Sorry, this response didn't exist."
 msgstr "Désolé, cette réponse n‘existe pas."
 
-#: reloadAnyResponse.php:374
+#: reloadAnyResponse.php:385
 msgid "Sorry, this access code is invalid."
 msgstr "Désolé, ce code d‘accès est invalide."
 
-#: reloadAnyResponse.php:385
-msgid "Sorry, something happen bad."
-msgstr "Désolé, quelque-chose s‘est mal passé."
-
-#: reloadAnyResponse.php:477
+#: reloadAnyResponse.php:489
 msgid "Response not found."
 msgstr "Cette réponse n‘à pas était trouvée."
 
-#: reloadAnyResponse.php:483
+#: reloadAnyResponse.php:495
 msgid "Access to this response need a valid token."
 msgstr "L‘accès à cette réponse nécessite un code d‘invitation valide."
 
-#: reloadAnyResponse.php:617
+#: reloadAnyResponse.php:642
 #, php-format
 msgid ""
 "Sorry, someone update this response to the questionnaire a short time ago. "
@@ -88,6 +88,9 @@ msgid ""
 msgstr ""
 "Désolé, quelqu‘un a mis à jour cette réponse il y a peu de temps. La "
 "dernière action a eu lieu il y a moins de %s minutes."
+
+#~ msgid "Sorry, something happen bad."
+#~ msgstr "Désolé, quelque-chose s‘est mal passé."
 
 #~ msgid "Yes"
 #~ msgstr "Oui"
