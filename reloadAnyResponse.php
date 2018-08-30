@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.5.2
+ * @version 0.6.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -132,7 +132,8 @@ class reloadAnyResponse extends PluginBase {
     /* delete current session*/
     $this->subscribe("afterSurveyComplete",'deleteSurveySession');
     $this->subscribe("afterSurveyQuota",'deleteSurveySession');
-
+    /* delete current session when unload */
+    $this->subscribe("newDirectRequest",'newDirectRequest');
   }
 
   /** @inheritdoc **/
@@ -338,7 +339,7 @@ class reloadAnyResponse extends PluginBase {
             Yii::app()->setConfig('surveysessiontime_limit',$multiAccessTime);
         }
         $disableMultiAccess = $this->_getCurrentSetting('disableMultiAccess',$surveyid);
-        if($multiAccessTime !== '0') {
+        if($multiAccessTime === '0') {
             $disableMultiAccess = false;
         }
         /* For token : @todo in beforeReloadReponse */
@@ -356,6 +357,9 @@ class reloadAnyResponse extends PluginBase {
         if(!$srid && $disableMultiAccess) {
             /* Always save current srid if needed , only reload can disable this */
             \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid);
+            if(isset($_SESSION['survey_'.$surveyid]['srid'])) {
+                $this->_addUnloadScript($surveyid,$_SESSION['survey_'.$surveyid]['srid']);
+            }
             return;
         }
         $oSurvey = Survey::model()->findByPk($surveyid);
@@ -379,7 +383,7 @@ class reloadAnyResponse extends PluginBase {
                 $editAllowed = true;
             }
             if(!$responseLink) {
-                throw new CHttpException(404,$this->_translate("Sorry, this response didn't exist."));
+                throw new CHttpException(404,$this->_translate("Sorry, this response didn‘t exist."));
             }
             if($responseLink && $responseLink->accesscode != $accesscode) {
                 throw new CHttpException(401,$this->_translate("Sorry, this access code is invalid."));
@@ -399,8 +403,8 @@ class reloadAnyResponse extends PluginBase {
         if($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
             $this->_endWithEditionMessage($since);
         }
-        
         $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
+        $this->_addUnloadScript($surveyid,$srid);
   }
 
     /**
@@ -408,9 +412,40 @@ class reloadAnyResponse extends PluginBase {
      */
     public function deleteSurveySession()
     {
-        $surveyId= $this->getEvent()->get('surveyId');
-        $responseId= $this->getEvent()->get('responseId');
+        $surveyId = $this->getEvent()->get('surveyId');
+        $responseId = $this->getEvent()->get('responseId');
         \reloadAnyResponse\models\surveySession::model()->deleteByPk(array('sid'=>$surveyId,'srid'=>$responseId));
+    }
+
+    /** @inheritdoc **/
+    public function newDirectRequest()
+    {
+        if($this->getEvent()->get('target') != get_class($this)) {
+            return;
+        }
+        $surveyId = Yii::app()->getRequest()->getParam('sid');
+        $responseId = Yii::app()->getRequest()->getParam('srid');
+        if($surveyId && $responseId) {
+            \reloadAnyResponse\models\surveySession::model()->deleteByPk(array('sid'=>$surveyId,'srid'=>$responseId));
+        }
+    }
+
+    /**
+     * Add beforeUnload script to delete session
+     * @param $surveyid
+     * @param $responseId
+     * @return @void
+     */
+    private function _addUnloadScript($surveyId,$responseId)
+    {
+        $ajaxUrl = $this->api->createUrl('plugins/direct', array('plugin' => get_class($this), 'function' => 'close','sid'=>$surveyId,'srid'=>$responseId));
+        $onBeforeUnload = "window.onbeforeunload = function(e) {\n";
+        //~ $onBeforeUnload .= " e.preventDefault();\n";
+        //~ $onBeforeUnload .= " return ' ';\n";
+        $onBeforeUnload .= " jQuery.ajax({ url:'{$ajaxUrl}' });\n";
+        $onBeforeUnload .= " return false;\n";
+        $onBeforeUnload .= "}\n";
+        Yii::app()->getClientScript()->registerScript("reloadAnyResponseBeforeUnload",$onBeforeUnload,CClientScript::POS_HEAD);
     }
   /**
    * Get boolean value for setting activation
@@ -519,6 +554,7 @@ class reloadAnyResponse extends PluginBase {
         initFieldArray($surveyid, $_SESSION['survey_'.$surveyid]['fieldmap']);
     }
     loadanswers();
+    \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid,$oResponse->id);
   }
 
   /**
