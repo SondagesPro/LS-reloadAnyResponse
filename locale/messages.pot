@@ -2,7 +2,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: reloadAnyResponse\n"
-"POT-Creation-Date: 2018-07-26 15:39+0200\n"
+"POT-Creation-Date: 2018-08-31 10:28+0200\n"
 "PO-Revision-Date: 2018-04-30 08:59+0200\n"
 "Last-Translator: Denis Chenu <contact@sondages.pro>\n"
 "Language-Team: \n"
@@ -10,7 +10,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 2.0.9\n"
+"X-Generator: Poedit 2.1.1\n"
 "X-Poedit-Basepath: ..\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Poedit-KeywordsList: _translate\n"
@@ -18,58 +18,58 @@ msgstr ""
 "X-Poedit-SearchPath-0: .\n"
 "X-Poedit-SearchPathExcluded-0: locale\n"
 
-#: reloadAnyResponse.php:161
+#: reloadAnyResponse.php:162
 msgid "Allow admin user to reload any response with response id."
 msgstr ""
 
-#: reloadAnyResponse.php:167 reloadAnyResponse.php:180
-#: reloadAnyResponse.php:192 reloadAnyResponse.php:204
-#: reloadAnyResponse.php:213
+#: reloadAnyResponse.php:168 reloadAnyResponse.php:181
+#: reloadAnyResponse.php:193 reloadAnyResponse.php:205
+#: reloadAnyResponse.php:214
 #, php-format
 msgid "Use default (%s)"
 msgstr ""
 
-#: reloadAnyResponse.php:173
+#: reloadAnyResponse.php:174
 msgid "Allow participant with token to create or reload responses."
 msgstr ""
 
-#: reloadAnyResponse.php:174
+#: reloadAnyResponse.php:175
 msgid "Related to “Enable token-based response persistence” and “Allow multiple responses or update responses” survey settings."
 msgstr ""
 
-#: reloadAnyResponse.php:186
+#: reloadAnyResponse.php:187
 msgid "Create unique code automatically."
 msgstr ""
 
-#: reloadAnyResponse.php:198
+#: reloadAnyResponse.php:199
 msgid "Allow using unique code if exist."
 msgstr ""
 
-#: reloadAnyResponse.php:210
+#: reloadAnyResponse.php:211
 msgid "Time for disable multiple access (in minutes)."
 msgstr ""
 
-#: reloadAnyResponse.php:351
+#: reloadAnyResponse.php:352
 msgid "We save your current session, you can try to reload the survey in some minutes."
 msgstr ""
 
-#: reloadAnyResponse.php:382
-msgid "Sorry, this response didn't exist."
+#: reloadAnyResponse.php:386
+msgid "Sorry, this response didn‘t exist."
 msgstr ""
 
-#: reloadAnyResponse.php:385
+#: reloadAnyResponse.php:389
 msgid "Sorry, this access code is invalid."
 msgstr ""
 
-#: reloadAnyResponse.php:489
+#: reloadAnyResponse.php:522
 msgid "Response not found."
 msgstr ""
 
-#: reloadAnyResponse.php:495
+#: reloadAnyResponse.php:528
 msgid "Access to this response need a valid token."
 msgstr ""
 
-#: reloadAnyResponse.php:642
+#: reloadAnyResponse.php:669
 #, php-format
 msgid "Sorry, someone update this response to the questionnaire a short time ago. The last action was made less than %s minutes ago."
 msgstr ""
