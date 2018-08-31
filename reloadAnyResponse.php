@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.7.0
+ * @version 0.7.1
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -342,6 +342,7 @@ class reloadAnyResponse extends PluginBase {
         if($multiAccessTime === '0') {
             $disableMultiAccess = false;
         }
+        $this->_fixLanguage($surveyid);
         /* For token : @todo in beforeReloadReponse */
         /* @todo : delete surveySession is save or clearall action */
         if($disableMultiAccess && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid))) {
@@ -502,6 +503,16 @@ class reloadAnyResponse extends PluginBase {
     if(empty(Yii::app()->getConfig('surveysessiontime_limit')) ) {
         Yii::app()->setConfig('surveysessiontime_limit',$this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']));
     }
+    $messageSource=array(
+        'class' => 'CGettextMessageSource',
+        //'cacheID' => get_class($this).'Lang',
+        'cachingDuration'=>3600,
+        'forceTranslation' => true,
+        'useMoFile' => true,
+        'basePath' => __DIR__ . DIRECTORY_SEPARATOR.'locale',
+        'catalog'=>'messages',// default from Yii
+    );
+    Yii::app()->setComponent(get_class($this).'Lang',$messageSource);
   }
 
   /**
@@ -714,26 +725,9 @@ class reloadAnyResponse extends PluginBase {
      * @param string
      * @return string
      */
-    private function _translate($string){
-        return Yii::t('',$string,array(),get_class($this));
-    }
-
-    /**
-     * Add this translation just after loaded all plugins
-     * @see event afterPluginLoad
-     */
-    public function afterPluginLoad(){
-        // messageSource for this plugin:
-        $messageSource=array(
-            'class' => 'CGettextMessageSource',
-            'cacheID' => get_class($this).'Lang',
-            'cachingDuration'=>3600,
-            'forceTranslation' => true,
-            'useMoFile' => true,
-            'basePath' => __DIR__ . DIRECTORY_SEPARATOR.'locale',
-            'catalog'=>'messages',// default from Yii
-        );
-        Yii::app()->setComponent(get_class($this),$messageSource);
+    private function _translate($string, $language = null){
+        $messageSource = get_class($this).'Lang';
+        return Yii::t('',$string,array(),$messageSource);
     }
 
     /**
@@ -784,5 +778,29 @@ class reloadAnyResponse extends PluginBase {
             \renderMessage\messageHelper::renderContent($message);
         }
         throw new CHttpException($errorCode, $errorMessage);
+    }
+
+    /**
+     * Set language according to survey or current language
+     * @param $surveyid
+     * @return $void
+     */
+    private function _fixLanguage($surveyId=null)
+    {
+        $currentLang = Yii::app()->getLanguage();
+        if((empty($currentLang) || $currentLang == "en_US") ) {
+            if(!empty($_SESSION['adminlang']) && $_SESSION['adminlang']!="auto") {
+                $currentLang = $_SESSION['adminlang'];
+            } else {
+                $currentLang = Yii::app()->getConfig("defaultlang");
+            }
+        }
+        if($surveyId) {
+            $oSurvey = Survey::model()->findByPk($surveyId);
+            if($oSurvey && !in_array($currentLang,$oSurvey->getAllLanguages())) {
+                $currentLang = $oSurvey->language;
+            }
+        }
+        Yii::app()->setLanguage($currentLang);
     }
 }
