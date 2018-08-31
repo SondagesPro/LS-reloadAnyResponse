@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.6.0
+ * @version 0.7.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -383,10 +383,10 @@ class reloadAnyResponse extends PluginBase {
                 $editAllowed = true;
             }
             if(!$responseLink) {
-                throw new CHttpException(404,$this->_translate("Sorry, this response didn‘t exist."));
+                $this->_HttpException(404,$this->_translate("Sorry, this response didn‘t exist."),$surveyid);
             }
             if($responseLink && $responseLink->accesscode != $accesscode) {
-                throw new CHttpException(401,$this->_translate("Sorry, this access code is invalid."));
+                $this->_HttpException(401,$this->_translate("Sorry, this access code is invalid."),$surveyid);
             }
         }
         if(!$editAllowed && $this->_getIsActivated('allowTokenUser',$surveyid) && $this->_accessibleWithToken($oSurvey)) {
@@ -440,10 +440,8 @@ class reloadAnyResponse extends PluginBase {
     {
         $ajaxUrl = $this->api->createUrl('plugins/direct', array('plugin' => get_class($this), 'function' => 'close','sid'=>$surveyId,'srid'=>$responseId));
         $onBeforeUnload = "window.onbeforeunload = function(e) {\n";
-        //~ $onBeforeUnload .= " e.preventDefault();\n";
-        //~ $onBeforeUnload .= " return ' ';\n";
         $onBeforeUnload .= " jQuery.ajax({ url:'{$ajaxUrl}' });\n";
-        $onBeforeUnload .= " return false;\n";
+        $onBeforeUnload .= " return null;\n";
         $onBeforeUnload .= "}\n";
         Yii::app()->getClientScript()->registerScript("reloadAnyResponseBeforeUnload",$onBeforeUnload,CClientScript::POS_HEAD);
     }
@@ -521,13 +519,13 @@ class reloadAnyResponse extends PluginBase {
     }
     $oResponse = SurveyDynamic::model($surveyid)->find("id = :srid",array(':srid'=>$srid));
     if(!$oResponse) {
-      throw new CHttpException(404, $this->_translate('Response not found.'));
+      $this->_HttpException(404, $this->_translate('Response not found.'),$surveyid);
     }
     $oSurvey = Survey::model()->findByPk($surveyid);
     // Validate token
     if(!Permission::model()->hasSurveyPermission($surveyid,'response','update') && $oResponse->token) {
       if($oResponse->token != $token) {
-        throw new CHttpException(401, $this->_translate('Access to this response need a valid token.'));
+        $this->_HttpException(401, $this->_translate('Access to this response need a valid token.'),$surveyid);
       }
     }
     killSurveySession($surveyid); // Is this needed ?
@@ -668,14 +666,17 @@ class reloadAnyResponse extends PluginBase {
      */
     private function _endWithEditionMessage($since,$comment=null)
     {
+        $messageString = sprintf($this->_translate("Sorry, someone update this response to the questionnaire a short time ago. The last action was made less than %s minutes ago."),ceil($since));
         if(!Yii::getPathOfAlias('renderMessage')) {
             /* plugin log */
-            $this->log("You need to download and activate renderMessage plugin for disableMultiAccess",'error');
+            $this->log("You need to download and activate renderMessage plugin for disableMultiAccess",'warning');
             /* Yii log as vardump if debug>0 to be shown to user (with red part) */
-            Yii::log("reloadAnyReponse plugin : You need to download and activate renderMessage plugin for disableMultiAccess", 'error', 'vardump');
+            Yii::log("reloadAnyReponse plugin : You need to download and activate renderMessage plugin for disableMultiAccess", 'warning', 'vardump');
+            $this->_HttpException("409",$messageString);
             return;
         }
-        $message = CHtml::tag("div",array("class"=>'alert alert-danger'),sprintf($this->_translate("Sorry, someone update this response to the questionnaire a short time ago. The last action was made less than %s minutes ago."),ceil($since)));
+        $message = CHtml::tag("h1",array("class"=>'text-danger'),"409 Conflict");
+        $message .= CHtml::tag("div",array("class"=>'alert alert-danger'),$messageString);
         if($comment) {
             if(is_string($comment)) {
                 $comment = array(
@@ -685,6 +686,7 @@ class reloadAnyResponse extends PluginBase {
             }
             $message .= CHtml::tag("div",array("class"=>$comment['class']),$comment['comment']);
         }
+        header($_SERVER["SERVER_PROTOCOL"]." 409 Conflict",true,409);
         \renderMessage\messageHelper::renderContent($message);
 
     }
@@ -734,4 +736,53 @@ class reloadAnyResponse extends PluginBase {
         Yii::app()->setComponent(get_class($this),$messageSource);
     }
 
+    /**
+     * Throw specific error
+     * @param @errorCode (404/401/403 totally supported)
+     * @param @errorMessage
+     * @param $surveyId
+     * @throw CHttpException
+     */
+    private function _HttpException($errorCode,$errorMessage,$surveyId=null)
+    {
+        $errorCodeHeader = array(
+            '401' => "401 Unauthorized",
+            '403' => "403 Forbidden",
+            '404' => "404 Not Found",
+            '409' => "409 Conflict",
+        );
+
+        $limesurveyVersion = Yii::app()->getConfig("versionnumber");
+        if(version_compare($limesurveyVersion,"3.14.0",'>=')) {
+            // @todo : Set template by survey
+            throw new CHttpException($errorCode, $errorMessage);
+        }
+
+        if(!array_key_exists($errorCode,$errorCodeHeader)) {
+            // Unable to do own system
+            throw new CHttpException($errorCode, $errorMessage);
+        }
+        if(version_compare($limesurveyVersion,"3.0.0")) {
+            header($_SERVER["SERVER_PROTOCOL"]." ".$errorCodeHeader[$errorCode],true,$errorCode);
+            Yii::app()->twigRenderer->renderTemplateFromFile("layout_errors.twig",
+                array('aSurveyInfo' =>array(
+                    'aError'=>array(
+                        'error'=>$errorCodeHeader[$errorCode],
+                        'title'=>$errorCodeHeader[$errorCode],
+                        'message'=>$errorMessage,
+                    ),
+                    'adminemail' => null,
+                    'adminname' => Yii::app()->getConfig('siteadminname'),
+                )),
+            false);
+        }
+        /* lesser than 3 */
+        if(Yii::getPathOfAlias('renderMessage')) {
+            $message = CHtml::tag("h1",array("class"=>'text-danger'),$errorCodeHeader[$errorCode]);
+            $message .= CHtml::tag("div",array("class"=>'alert alert-danger'),$errorMessage);
+            header($_SERVER["SERVER_PROTOCOL"]." ".$errorCodeHeader[$errorCode],true,$errorCode);
+            \renderMessage\messageHelper::renderContent($message);
+        }
+        throw new CHttpException($errorCode, $errorMessage);
+    }
 }
