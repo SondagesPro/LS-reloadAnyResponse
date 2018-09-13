@@ -529,6 +529,7 @@ class reloadAnyResponse extends PluginBase {
       return;
     }
     $oResponse = SurveyDynamic::model($surveyid)->find("id = :srid",array(':srid'=>$srid));
+    $language = Yii::app()->getLanguage();
     if(!$oResponse) {
       $this->_HttpException(404, $this->_translate('Response not found.'),$surveyid);
     }
@@ -554,6 +555,7 @@ class reloadAnyResponse extends PluginBase {
             // Better to set Survey to alloweditaftercompletion == 'Y', but unable at this time on afterFindSurvey event
         }
     }
+    $_SESSION['survey_'.$surveyid]['s_lang'] = $language; /* buildsurveysession use session lang … , send a notic if not set */
     buildsurveysession($surveyid);
     if (!empty($oResponse->submitdate)) {
         $_SESSION['survey_'.$surveyid]['maxstep'] = $_SESSION['survey_'.$surveyid]['totalsteps'];
