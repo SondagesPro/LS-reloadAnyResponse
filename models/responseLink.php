@@ -1,6 +1,7 @@
 <?php
 /**
  * This file is part of reloadAnyResponse plugin
+ * @version 1.0.1
  */
 namespace reloadAnyResponse\models;
 use Yii;
@@ -52,7 +53,9 @@ class responseLink extends CActiveRecord
             $oResponseLink->srid = $srid;
             $oResponseLink->token = $token;
             $oResponseLink->accesscode = Yii::app()->securityManager->generateRandomString(42);
-            $oResponseLink->save();
+            if(!$oResponseLink->save()) {
+                $oResponseLink->accesscode = null;// Then if have error : we don't return an access code
+            }
         }
         return $oResponseLink;
     }
@@ -60,9 +63,10 @@ class responseLink extends CActiveRecord
     
     /**
      * Get link to the survey with params
+     * $absolute boolean : get absolute url
      * @return string
      */
-    public function getStartUrl()
+    public function getStartUrl($absolute = true)
     {
         /* Find a way to set code */
         $params = array(
@@ -71,6 +75,12 @@ class responseLink extends CActiveRecord
         );
         if($this->token) {
             $params['token'] = $this->token;
+        }
+        if(!$absolute) {
+            return Yii::app()->getController()->createUrl(
+                "/survey/index/sid/{$this->sid}",
+                $params
+            );
         }
         return Yii::app()->getController()->createAbsoluteUrl(
             "/survey/index/sid/{$this->sid}",

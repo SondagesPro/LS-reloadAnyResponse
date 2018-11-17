@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.7.1
+ * @version 0.8.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -71,6 +71,36 @@ class reloadAnyResponse extends PluginBase {
         'help'=>"If you set to no, this disable usage for other plugins.",
         'default'=>1,
     ),
+    'deleteLinkWhenResponseDeleted' => array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label'=>"Delete the link of response when a response is deleted.",
+        'help'=>"This delete the response link when response is deleted. If you use VV import, don't activate this option.",
+        'default'=>0,
+    ),
+    'deleteLinkWhenSurveyDeactivated' => array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label'=>"Delete the link of all responses of a survey when it's deactivated.",
+        'help'=>"Since response table keep the current auto increment value, leave this option can not broke response security.",
+        'default'=>0,
+    ),
+    'deleteLinkWhenSurveyDeleted' => array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label'=>"Delete the link of all responses of a survey when it's deleted.",
+        'help'=>"To avoid a big table.",
+        'default'=>1,
+    ),
     'disableMultiAccess' => array(
         'type'=>'info',
         'content'=>"<div class='alert alert-info'>You need renderMessage for disabling multiple access.</div>",
@@ -118,9 +148,14 @@ class reloadAnyResponse extends PluginBase {
     if($oPlugin && $oPlugin->active) {
       $this->_setConfig();
     }
-    /* Managing unique code */
+    /* Managing unique code for Response and SurveyDynamic */
     $this->subscribe('afterModelSave');
     $this->subscribe('afterModelDelete');
+    /* Delete related link for Survey */
+    $this->subscribe('afterSurveySave');
+    $this->subscribe('afterSurveyDelete');
+    $this->subscribe('beforeSurveyDeleteMany');
+
     /* Get the survey by srid and code */
     /* Save current session */
     $this->subscribe('beforeSurveyPage');
@@ -234,23 +269,58 @@ class reloadAnyResponse extends PluginBase {
     $this->_createDb();
   }
 
-  /** @inheritdoc **/
+  /** @inheritdoc
+   * Delete all response link when survey is set to active != Y
+   **/
+  public function afterSurveySave()
+  {
+    if($this->_getCurrentSetting('deleteLinkWhenSurveyDeactivated')) {
+      $oSurvey = $this->getEvent()->get('model');
+      if($oSurvey->sid && $oSurvey->active != 'Y') {
+        $deleted = \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = sid",array('sid'=>$oSurvey->sid));
+        if($oSurvey>0) { // Don't log each time, can be saved for something other …
+          $this->log(sprintf("%d responseLink deleted for %d",$deleted,$oSurvey->sid),CLogger::LEVEL_INFO);
+        }
+      }
+    }
+  }
+
+  /** @inheritdoc
+   * Delete all response link when survey is deleted
+   **/
+  public function afterSurveyDelete()
+  {
+    if($this->_getCurrentSetting('deleteLinkWhenSurveyDeleted')) {
+      $oSurvey = $this->getEvent()->get('model');
+      if($oSurvey->sid) {
+        $deleted = \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = sid",array('sid'=>$oSurvey->sid));
+        if($oSurvey>0) { // Don't log each time, can be saved for something other …
+          $this->log(sprintf("%d responseLink deleted for %d",$deleted,$oSurvey->sid),CLogger::LEVEL_INFO);
+        }
+      }
+    }
+  }
+
+  /** @inheritdoc
+   * Delete all response link when surveys is deleted
+   * @todo
+   **/
+  public function beforeSurveyDeleteMany()
+  {
+    if($this->_getCurrentSetting('deleteLinkWhenSurveyDeleted')) {
+      $criteria = $this->getEvent()->get('filterCriteria');
+    }
+  }
+
+  /** @inheritdoc
+   * Create the response link when survey is started
+   * Remind : it's better if your plugin create this link directly `$responseLink = \reloadAnyResponse\models\responseLink::setResponseLink($iSurvey,$iResponse,$token);`
+   * Before 3.15.0 : afterResponseSave event didn't exist
+   **/
   public function afterModelSave()
   {
     $oModel = $this->getEvent()->get('model');
     $className = get_class($oModel);
-
-    /* Delete all link when set a survey to inactive (@todo : test it) */
-    if($className == 'Survey') {
-      $sid = isset($oModel->sid) ? $oModel->sid : null;
-      if($oModel->sid && $oModel->active != 'Y') {
-        $deleted = \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = sid",array('sid'=>$oModel->sid));
-        if($deleted>0) { // Don't log each time, can be saved for something other …
-          $this->log(sprintf("%d responseLink deleted for %d",$deleted,$oModel->sid),CLogger::LEVEL_INFO);
-        }
-      }
-    }
-
     /* Create responlink for survey and srid (work when start a survey) */
     if($className == 'SurveyDynamic' || $className == 'Response') {
       $sid = str_replace(array('{{survey_','}}'),array('',''),$oModel->tableName());
@@ -261,9 +331,10 @@ class reloadAnyResponse extends PluginBase {
       $srid = isset($oModel->id) ? $oModel->id : null;
       if($sid && $srid) {
         $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
-        /* @todo : add a way to reset potential token ? */
+        /* @todo : add a way to reset potential token ?
+         * @see https://gitlab.com/SondagesPro/managament/responseListAndManage/blob/80fb8571d394eedda6abfbfd1757c5322f699608/responseListAndManage.php#L2336
+         **/
         if(!$responseLink) {
-          /* @todo replace by \reloadAnyResponse\models\responseLink::getResponseLink('sid'=>$sid,'srid'=>$srid,$token,false) */
           $token = isset($oModel->token) ? $oModel->token : null;
           $responseLink = \reloadAnyResponse\models\responseLink::setResponseLink($sid,$srid,$token);
           if(!$responseLink) {
@@ -275,16 +346,23 @@ class reloadAnyResponse extends PluginBase {
     }
   }
 
-  /** @inheritdoc **/
+  /**
+   * @inheritdoc
+   * Delete related responseLink when a response is deleted
+   * Before 3.15.0 : afterResponseSave event didn't exist
+   * This function is in testing currently
+   **/
   public function afterModelDelete()
   {
-    $oModel = $this->getEvent()->get('model');
-    $className = get_class($oModel);
-    if($className == 'SurveyDynamic' || $className == 'Response') {
-      $sid = str_replace(array('{{survey_','}}'),array('',''),$oModel->tableName());
-      $srid = isset($oModel->id) ? $oModel->id : null;
-      if($srid) {
-        \reloadAnyResponse\models\responseLink::model()->deleteByPk(array('sid'=>$sid,'srid'=>$srid));
+    if($this->_getCurrentSetting('deleteLinkWhenResponseDeleted')) {
+      $oModel = $this->getEvent()->get('model');
+      $className = get_class($oModel);
+      if($className == 'SurveyDynamic' || $className == 'Response') {
+        $sid = str_replace(array('{{survey_','}}'),array('',''),$oModel->tableName());
+        $srid = isset($oModel->id) ? $oModel->id : null;
+        if($srid) {
+          \reloadAnyResponse\models\responseLink::model()->deleteByPk(array('sid'=>$sid,'srid'=>$srid));
+        }
       }
     }
   }
