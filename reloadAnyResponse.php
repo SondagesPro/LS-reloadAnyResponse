@@ -278,7 +278,7 @@ class reloadAnyResponse extends PluginBase {
       $oSurvey = $this->getEvent()->get('model');
       if($oSurvey->sid && $oSurvey->active != 'Y') {
         $deleted = \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = sid",array('sid'=>$oSurvey->sid));
-        if($oSurvey>0) { // Don't log each time, can be saved for something other …
+        if($deleted>0) { // Don't log each time, can be saved for something other …
           $this->log(sprintf("%d responseLink deleted for %d",$deleted,$oSurvey->sid),CLogger::LEVEL_INFO);
         }
       }
@@ -294,7 +294,7 @@ class reloadAnyResponse extends PluginBase {
       $oSurvey = $this->getEvent()->get('model');
       if($oSurvey->sid) {
         $deleted = \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = sid",array('sid'=>$oSurvey->sid));
-        if($oSurvey>0) { // Don't log each time, can be saved for something other …
+        if($deleted>0) { // Don't log each time, can be saved for something other …
           $this->log(sprintf("%d responseLink deleted for %d",$deleted,$oSurvey->sid),CLogger::LEVEL_INFO);
         }
       }
