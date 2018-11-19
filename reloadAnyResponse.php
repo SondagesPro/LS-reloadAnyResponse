@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.8.0
+ * @version 0.8.1
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -612,7 +612,7 @@ class reloadAnyResponse extends PluginBase {
       $this->_HttpException(404, $this->_translate('Response not found.'),$surveyid);
     }
     $oSurvey = Survey::model()->findByPk($surveyid);
-    // Validate token
+    // Validate token : @todo review for admin user
     if(!Permission::model()->hasSurveyPermission($surveyid,'response','update') && $oResponse->token) {
       if($oResponse->token != $token) {
         $this->_HttpException(401, $this->_translate('Access to this response need a valid token.'),$surveyid);
@@ -637,6 +637,9 @@ class reloadAnyResponse extends PluginBase {
     buildsurveysession($surveyid);
     if (!empty($oResponse->submitdate)) {
         $_SESSION['survey_'.$surveyid]['maxstep'] = $_SESSION['survey_'.$surveyid]['totalsteps'];
+    }
+    if (!empty($oResponse->token)) {
+        $_SESSION['survey_'.$surveyid]['token'] = $oResponse->token;
     }
     if(version_compare(Yii::app()->getConfig('versionnumber'),"3",">=")) {
         randomizationGroupsAndQuestions($surveyid);
