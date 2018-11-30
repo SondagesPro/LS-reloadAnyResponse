@@ -1,15 +1,18 @@
 <?php
 /**
  * This file is part of reloadAnyResponse plugin
+ * @version 1.0.0
  */
 namespace reloadAnyResponse\models;
 use Yii;
 use CActiveRecord;
 use Response;
+use Survey;
+
 class surveySession extends CActiveRecord
 {
     /**
-     * Class surveyChaining\models\chainingResponseLink
+     * Class reloadAnyResponse\models\surveySession
      *
      * @property integer $sid survey
      * @property integer $srid : response id
@@ -72,16 +75,18 @@ class surveySession extends CActiveRecord
         if(!$srid && !$token) {
             return;
         }
-        if(!$token) {
-            $token = isset($_SESSION['survey_'.$sid]['token']) ? $_SESSION['survey_'.$sid]['token'] : null;
-        }
-        if(!$token) {
-            $token = Yii::app()->getRequest()->getParam('token');
-        }
-        if(!$token) {
-            $oResponse = Response::model($sid)->findByPk($srid);
-            if($oResponse && !empty($oResponse->token)) {
-                $token = $oResponse->token;
+        if(Survey::model()->findByPk($sid)->getHasTokensTable()) {
+            if(!$token) {
+                $token = isset($_SESSION['survey_'.$sid]['token']) ? $_SESSION['survey_'.$sid]['token'] : null;
+            }
+            if(!$token) {
+                $token = Yii::app()->getRequest()->getParam('token');
+            }
+            if(!$token) {
+                $oResponse = Response::model($sid)->findByPk($srid);
+                if($oResponse && !empty($oResponse->token)) {
+                    $token = $oResponse->token;
+                }
             }
         }
         $oSessionSurvey = self::model()->find("sid = :sid and srid = :srid",array(':sid'=>$sid,':srid'=>$srid));
