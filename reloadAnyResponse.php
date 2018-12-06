@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.9.1
+ * @version 0.9.2
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,8 @@ class reloadAnyResponse extends PluginBase {
 
   static protected $description = 'New class and function allowing to reload any survey.';
   static protected $name = 'reloadAnyResponse';
+
+  static protected $dbVersion = 1;
 
   const KeepSessionNumber = 15;
   /**
@@ -545,6 +547,10 @@ class reloadAnyResponse extends PluginBase {
     */
     private function _createDb()
     {
+        if($this->get("dbVersion") == self::$dbVersion) {
+            return;
+        }
+        /* dbVersion not needed */
         if (!$this->api->tableExists($this, 'responseLink'))
         {
             $this->api->createTable($this, 'responseLink', array(
@@ -564,6 +570,16 @@ class reloadAnyResponse extends PluginBase {
                 'lastaction' => 'datetime'
             ));
         }
+        if(!$this->get("dbVersion")) {
+            $tableName = $this->api->getTable($this,'surveySession')->tableName();
+            Yii::app()->getDb()->createCommand()->addPrimaryKey('surveysession_sidsrid',$tableName,'sid,srid');
+            $tableName = $this->api->getTable($this,'responseLink')->tableName();
+            Yii::app()->getDb()->createCommand()->addPrimaryKey('responselink_sidsrid',$tableName,'sid,srid');
+            $this->set("dbVersion",1);
+        }
+
+        /* all done */
+        $this->set("dbVersion",self::$dbVersion);
     }
 
   /**
