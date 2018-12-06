@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.9.0
+ * @version 0.9.1
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -407,6 +407,7 @@ class reloadAnyResponse extends PluginBase {
             $previousSessionId = array();
         }
         $previousSessionId[] = Yii::app()->getSession()->getSessionID();
+        $previousSessionId = array_unique($previousSessionId);
         if(count($previousSessionId) > self::KeepSessionNumber ) {
             array_shift($previousSessionId);
         }
