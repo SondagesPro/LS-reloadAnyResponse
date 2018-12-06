@@ -1,7 +1,7 @@
 <?php
 /**
  * This file is part of reloadAnyResponse plugin
- * @version 1.0.0
+ * @version 1.0.1
  */
 namespace reloadAnyResponse\models;
 use Yii;
@@ -127,8 +127,9 @@ class surveySession extends CActiveRecord
             array(":sid"=>$sid,":lastaction"=>$maxDateTime)
         );
         $oSessionSurvey = self::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
-        /* No current session : can quit */
+        /* No current session save it and can quit */
         if(!$oSessionSurvey) {
+            self::saveSessionTime($sid,$srid);
             return null;
         }
         /* Same session : save time and quit */
@@ -145,6 +146,11 @@ class surveySession extends CActiveRecord
             $oSessionSurvey->save();
             return null;
         }
+        tracevar([
+            $oSessionSurvey->session,
+            Yii::app()->getSession()->getSessionID(),
+            $previousSessionId,
+        ]);
         $lastaction = strtotime($oSessionSurvey->lastaction);
         $now = strtotime("now");
         $sinceTime = abs($lastaction - $now) / 60;

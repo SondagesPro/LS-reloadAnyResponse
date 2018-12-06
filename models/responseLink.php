@@ -1,7 +1,7 @@
 <?php
 /**
  * This file is part of reloadAnyResponse plugin
- * @version 1.0.1
+ * @version 1.0.2
  */
 namespace reloadAnyResponse\models;
 use Yii;
@@ -45,7 +45,7 @@ class responseLink extends CActiveRecord
         $oResponseLink = self::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
         if($oResponseLink && $token) {
             $oResponseLink->token = $token;
-            $oResponseLink->save;
+            $oResponseLink->save();
         }
         if(!$oResponseLink) {
             $oResponseLink = new self;
