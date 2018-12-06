@@ -26,7 +26,7 @@ class reloadAnyResponse extends PluginBase {
 
   static protected $dbVersion = 1;
 
-  const KeepSessionNumber = 15;
+  const KeepSessionNumber = 40;
   /**
    * @var array[] the settings
    */
@@ -161,6 +161,7 @@ class reloadAnyResponse extends PluginBase {
     /* Get the survey by srid and code */
     /* Save current session */
     $this->subscribe('beforeSurveyPage');
+    $this->subscribe('getPluginTwigPath');
     /* Replace existing system if srid = new */
     $this->subscribe('beforeLoadResponse');
     /* Survey settings */
@@ -489,6 +490,26 @@ class reloadAnyResponse extends PluginBase {
         $this->_addUnloadScript($surveyid,$srid);
   }
 
+    /** @inheritdoc
+     * Need to update current previousSessionId after all other action done
+     **/
+    public function getPluginTwigPath()
+    {
+        $surveyid = Yii::app()->getRequest()->getParam('sid',Yii::app()->getRequest()->getParam('surveyid'));
+        if(empty($surveyid)) {
+            return;
+        }
+        $previousSessionId = Yii::app()->session['previousSessionId'];
+        if(empty($previousSessionId)) {
+            $previousSessionId = array();
+        }
+        $previousSessionId[] = Yii::app()->getSession()->getSessionID();
+        $previousSessionId = array_unique($previousSessionId);
+        if(count($previousSessionId) > self::KeepSessionNumber ) {
+            array_shift($previousSessionId);
+        }
+        Yii::app()->session['previousSessionId'] = $previousSessionId;
+    }
     /**
      * Delete SurveySession for this event srid
      */

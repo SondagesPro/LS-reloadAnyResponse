@@ -1,7 +1,7 @@
 <?php
 /**
  * This file is part of reloadAnyResponse plugin
- * @version 1.0.1
+ * @version 1.0.2
  */
 namespace reloadAnyResponse\models;
 use Yii;
@@ -75,7 +75,8 @@ class surveySession extends CActiveRecord
         if(!$srid && !$token) {
             return;
         }
-        if(Survey::model()->findByPk($sid)->getHasTokensTable()) {
+        $oSurvey = Survey::model()->findByPk($sid);
+        if($oSurvey->getHasTokensTable()) {
             if(!$token) {
                 $token = isset($_SESSION['survey_'.$sid]['token']) ? $_SESSION['survey_'.$sid]['token'] : null;
             }
@@ -84,7 +85,7 @@ class surveySession extends CActiveRecord
             }
             if(!$token) {
                 $oResponse = Response::model($sid)->findByPk($srid);
-                if($oResponse && !empty($oResponse->token)) {
+                if($oResponse && $oSurvey->anonymized != "N" && !empty($oResponse->token)) {
                     $token = $oResponse->token;
                 }
             }
@@ -146,11 +147,6 @@ class surveySession extends CActiveRecord
             $oSessionSurvey->save();
             return null;
         }
-        tracevar([
-            $oSessionSurvey->session,
-            Yii::app()->getSession()->getSessionID(),
-            $previousSessionId,
-        ]);
         $lastaction = strtotime($oSessionSurvey->lastaction);
         $now = strtotime("now");
         $sinceTime = abs($lastaction - $now) / 60;
