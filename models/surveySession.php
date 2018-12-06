@@ -23,6 +23,8 @@ class surveySession extends CActiveRecord
 
     /* @const integer The max time for session, if it's not set in session or by server (0 in session_time_limit) */
     const maxSessionTime = 30;
+    /* @const integer The max session id number to keep */
+    const KeepSessionNumber = 40;
 
     /** @inheritdoc */
     public static function model($className=__CLASS__) {
@@ -101,6 +103,7 @@ class surveySession extends CActiveRecord
         }
         $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
         $oSessionSurvey->session = Yii::app()->getSession()->getSessionID();
+        self::addCurrrentSessionInPrevious(Yii::app()->getSession()->getSessionID());
         $oSessionSurvey->save();
         return $oSessionSurvey;
     }
@@ -136,6 +139,7 @@ class surveySession extends CActiveRecord
         /* Same session : save time and quit */
         if($oSessionSurvey->session == Yii::app()->getSession()->getSessionID()) {
             $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
+            self::addCurrrentSessionInPrevious(Yii::app()->getSession()->getSessionID());
             $oSessionSurvey->save();
             return null;
         }
@@ -160,5 +164,29 @@ class surveySession extends CActiveRecord
     private static function  _getSessionTimeLimit() {
         $sessionTimeLimit = intval(Yii::app()->getConfig('surveysessiontime_limit',self::maxSessionTime));
         return $sessionTimeLimit;
+    }
+
+    /**
+     * try to keep previous session in session …
+     * @param string $sessionId, ifb not set : current one
+     * @return void
+     */
+    public static function addCurrrentSessionInPrevious($sessionId=null)
+    {
+        $previousSessionIds = Yii::app()->session['previousSessionId'];
+        if(empty($previousSessionIds)) {
+            $previousSessionIds = array();
+        }
+        if(empty($sessionId)) {
+            $sessionId = Yii::app()->getSession()->getSessionID();
+        }
+        if(!in_array($sessionId,$previousSessionIds)) {
+            $previousSessionIds[] = $sessionId;
+        }
+        $previousSessionIds = array_unique($previousSessionIds);
+        if(count($previousSessionIds) > self::KeepSessionNumber ) {
+            array_shift($previousSessionIds);
+        }
+        Yii::app()->session['previousSessionId'] = $previousSessionIds;
     }
 }
