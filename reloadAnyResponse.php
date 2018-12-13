@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.9.2
+ * @version 0.9.3
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ class reloadAnyResponse extends PluginBase {
   static protected $description = 'New class and function allowing to reload any survey.';
   static protected $name = 'reloadAnyResponse';
 
-  static protected $dbVersion = 1;
+  static protected $dbVersion = 2;
 
   /**
    * @var array[] the settings
@@ -541,31 +541,44 @@ class reloadAnyResponse extends PluginBase {
             return;
         }
         /* dbVersion not needed */
-        if (!$this->api->tableExists($this, 'responseLink'))
-        {
+        if(!$this->api->tableExists($this, 'responseLink') && !$this->api->tableExists($this, 'surveySession')) {
             $this->api->createTable($this, 'responseLink', array(
-                'sid'=>'int',
-                'srid'=>'int',
+                'sid'=>'int not NULL',
+                'srid'=>'int not NULL',
                 'token'=>'text',
                 'accesscode'=>'text',
             ));
-        }
-        if (!$this->api->tableExists($this, 'surveySession'))
-        {
             $this->api->createTable($this, 'surveySession', array(
-                'sid' => 'int',
-                'srid' => 'int',
+                'sid' => 'int not NULL',
+                'srid' => 'int not NULL',
                 'token' => 'string(55)',
                 'session' => 'text',
                 'lastaction' => 'datetime'
             ));
+            $this->set("dbVersion",self::$dbVersion);
+            return;
         }
         if(!$this->get("dbVersion")) {
             $tableName = $this->api->getTable($this,'surveySession')->tableName();
+            Yii::app()->getDb()->createCommand()->alterColumn($tableName,'sid','int not NULL');
+            Yii::app()->getDb()->createCommand()->alterColumn($tableName,'srid','int not NULL');
             Yii::app()->getDb()->createCommand()->addPrimaryKey('surveysession_sidsrid',$tableName,'sid,srid');
+
             $tableName = $this->api->getTable($this,'responseLink')->tableName();
+            Yii::app()->getDb()->createCommand()->alterColumn($tableName,'sid','int not NULL');
+            Yii::app()->getDb()->createCommand()->alterColumn($tableName,'srid','int not NULL');
             Yii::app()->getDb()->createCommand()->addPrimaryKey('responselink_sidsrid',$tableName,'sid,srid');
-            $this->set("dbVersion",1);
+            $this->set("dbVersion",2);
+        }
+        if($this->get("dbVersion") < 2 ) {
+            $tableName = $this->api->getTable($this,'surveySession')->tableName();
+            Yii::app()->getDb()->createCommand()->alterColumn($tableName,'sid','int not NULL');
+            Yii::app()->getDb()->createCommand()->alterColumn($tableName,'srid','int not NULL');
+
+            $tableName = $this->api->getTable($this,'responseLink')->tableName();
+            Yii::app()->getDb()->createCommand()->alterColumn($tableName,'sid','int not NULL');
+            Yii::app()->getDb()->createCommand()->alterColumn($tableName,'srid','int not NULL');
+            $this->set("dbVersion",2);
         }
 
         /* all done */

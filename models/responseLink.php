@@ -87,4 +87,24 @@ class responseLink extends CActiveRecord
             $params
         );
     }
+
+    /**
+     * @inheritdoc
+     */
+    public function rules()
+    {
+        $aRules = array(
+            array('sid', 'required'),
+            array('srid', 'required'),
+            array('sid,srid', 'numerical', 'integerOnly'=>true),
+            array('srid', 'unique', 'criteria'=>array(
+                    'condition'=>'sid=:sid',
+                    'params'=>array(':sid'=>$this->sid)
+                ),
+                'message'=>sprintf("Srid : '%s' already set for '%s'.",$this->srid,$this->sid),
+            ),
+        );
+        return $aRules;
+    }
+
 }
