@@ -113,6 +113,7 @@ class reloadAnyResponse extends PluginBase {
         'help' => 'Before save value or entering survey : test if someone else edit response in this last minutes. Disable save and show a message if yes. Set to empty disable system but then answer of user can be deleted by another user without any information…',
         'htmlOptions'=>array(
             'min'=>1,
+            'placeholder'=>'Disable',
         ),
         'default' => 20,
     ),
