@@ -3,9 +3,9 @@
  * Plugin helper for limesurvey : new class and function allowing to reload any survey
  *
  * @author Denis Chenu <denis@sondages.pro>
- * @copyright 2018 Denis Chenu <http://www.sondages.pro>
+ * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 0.9.3
+ * @version 1.0.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,6 +42,16 @@ class reloadAnyResponse extends PluginBase {
         ),
         'label'=>"Allow admin user to reload any survey with response id.",
         'default'=>1,
+    ),
+    'replaceEditResponse' => array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label'=>"Replace edit response in browse response interface.",
+        'help'=>"When an admin user want to edit an existing response : he was redirected to editing the public survey.",
+        'default'=>0,
     ),
     'allowTokenUser' => array(
         'type'=>'checkbox',
@@ -171,6 +181,8 @@ class reloadAnyResponse extends PluginBase {
     $this->subscribe("afterSurveyQuota",'deleteSurveySession');
     /* delete current session when unload */
     $this->subscribe("newDirectRequest",'newDirectRequest');
+    /* redirect to editing survey */
+    $this->subscribe("beforeControllerAction",'beforeControllerAction');
   }
 
   /** @inheritdoc **/
@@ -254,6 +266,37 @@ class reloadAnyResponse extends PluginBase {
         ),
       ),
     ));
+  }
+
+  public function beforeControllerAction()
+  {
+    if(!$this->get('replaceEditResponse') || !$this->get('allowAdminUser')) {
+      return;
+    }
+    if($this->getEvent()->get("controller") != "admin") {
+      return;
+    }
+    if($this->getEvent()->get("action") != "dataentry") {
+      return;
+    }
+    if($this->getEvent()->get("subaction") != "editdata") {
+      return;
+    }
+    $surveyid = App()->getRequest()->getParam('surveyid');
+    $srid = App()->getRequest()->getParam('id');
+    if(!Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
+      return;
+    }
+    $oResponse = Response::model($surveyid)->findByPk($srid);
+    if(empty($oResponse)) {
+      return;
+    }
+    $surveyLink = Yii::app()->createUrl("survey/index", array('sid' => $surveyid,'srid'=>$srid,'newtest'=>'Y'));
+    if(!empty($oResponse->token)) {
+      $surveyLink = Yii::app()->createUrl("survey/index", array('sid' => $surveyid,'token'=>$oResponse->token,'srid'=>$srid,'newtest'=>'Y'));
+    }
+    $this->getEvent()->set('run',false);
+    App()->getController()->redirect($surveyLink);
   }
 
   /** @inheritdoc **/
