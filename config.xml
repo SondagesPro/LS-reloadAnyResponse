@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <metadata>
+        <name>reloadAnyResponse</name>
+        <type>plugin</type>
+        <creationDate>2018-04-18</creationDate>
+        <lastUpdate>2019-02-28</lastUpdate>
+        <author>Denis Chenu</author>
+        <authorUrl>https://extensions.sondages.pro/reloadanyresponse</authorUrl>
+        <supportUrl>https://support.sondages.pro/</supportUrl>
+        <version>1.0.2</version>
+        <license>GNU Affero General Public License v3.0</license>
+        <description><![CDATA[Allow to reload any response for admin user and respondant.]]></description>
+    </metadata>
+
+    <compatibility>
+        <version>3.0</version>
+    </compatibility>
+
+</config>
