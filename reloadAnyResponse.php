@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.0.2
+ * @version 1.0.3
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -292,7 +292,8 @@ class reloadAnyResponse extends PluginBase {
       return;
     }
     $surveyLink = Yii::app()->createUrl("survey/index", array('sid' => $surveyid,'srid'=>$srid,'newtest'=>'Y'));
-    if(!empty($oResponse->token)) {
+
+    if(tableExists('tokens_'.$surveyid) && !empty($oResponse->token)) {
       $surveyLink = Yii::app()->createUrl("survey/index", array('sid' => $surveyid,'token'=>$oResponse->token,'srid'=>$srid,'newtest'=>'Y'));
     }
     $this->getEvent()->set('run',false);
@@ -677,7 +678,7 @@ class reloadAnyResponse extends PluginBase {
     }
     $oSurvey = Survey::model()->findByPk($surveyid);
     // Validate token : @todo review for admin user
-    if(!Permission::model()->hasSurveyPermission($surveyid,'response','update') && !empty($oResponse->token)) {
+    if(!Permission::model()->hasSurveyPermission($surveyid,'response','update') && tableExists('tokens_'.$surveyid) && !empty($oResponse->token)) {
       if($oResponse->token != $token) {
         $this->_HttpException(401, $this->_translate('Access to this response need a valid token.'),$surveyid);
       }
@@ -702,7 +703,7 @@ class reloadAnyResponse extends PluginBase {
     if (!empty($oResponse->submitdate)) {
         $_SESSION['survey_'.$surveyid]['maxstep'] = $_SESSION['survey_'.$surveyid]['totalsteps'];
     }
-    if (!empty($oResponse->token)) {
+    if (tableExists('tokens_'.$surveyid) && !empty($oResponse->token)) {
         $_SESSION['survey_'.$surveyid]['token'] = $oResponse->token;
     }
     if(version_compare(Yii::app()->getConfig('versionnumber'),"3",">=")) {
