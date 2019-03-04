@@ -293,9 +293,6 @@ class reloadAnyResponse extends PluginBase {
     }
     $surveyLink = Yii::app()->createUrl("survey/index", array('sid' => $surveyid,'srid'=>$srid,'newtest'=>'Y'));
 
-    if(tableExists('tokens_'.$surveyid) && !empty($oResponse->token)) {
-      $surveyLink = Yii::app()->createUrl("survey/index", array('sid' => $surveyid,'token'=>$oResponse->token,'srid'=>$srid,'newtest'=>'Y'));
-    }
     $this->getEvent()->set('run',false);
     App()->getController()->redirect($surveyLink);
   }
