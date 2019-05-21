@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.0.3
+ * @version 1.0.4
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -320,7 +320,7 @@ class reloadAnyResponse extends PluginBase {
     if($this->_getCurrentSetting('deleteLinkWhenSurveyDeactivated')) {
       $oSurvey = $this->getEvent()->get('model');
       if($oSurvey->sid && $oSurvey->active != 'Y') {
-        $deleted = \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = sid",array('sid'=>$oSurvey->sid));
+        $deleted = \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = :sid",array(':sid'=>$oSurvey->sid));
         if($deleted>0) { // Don't log each time, can be saved for something other …
           $this->log(sprintf("%d responseLink deleted for %d",$deleted,$oSurvey->sid),CLogger::LEVEL_INFO);
         }
@@ -336,7 +336,7 @@ class reloadAnyResponse extends PluginBase {
     if($this->_getCurrentSetting('deleteLinkWhenSurveyDeleted')) {
       $oSurvey = $this->getEvent()->get('model');
       if($oSurvey->sid) {
-        $deleted = \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = sid",array('sid'=>$oSurvey->sid));
+        $deleted = \reloadAnyResponse\models\responseLink::model()->deleteAll("sid = :sid",array(':sid'=>$oSurvey->sid));
         if($deleted>0) { // Don't log each time, can be saved for something other …
           $this->log(sprintf("%d responseLink deleted for %d",$deleted,$oSurvey->sid),CLogger::LEVEL_INFO);
         }
