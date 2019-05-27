@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.0.5
+ * @version 1.1.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -125,7 +125,7 @@ class reloadAnyResponse extends PluginBase {
             'min'=>1,
             'placeholder'=>'Disable',
         ),
-        'default' => 20,
+        'default' => 30,
     ),
     //~ 'multiAccessTimeOptOut'=>array(
         //~ 'type'=>'int',
@@ -430,7 +430,7 @@ class reloadAnyResponse extends PluginBase {
             'order' => 'id DESC',
             'params' => array('token' => $token)
         ));
-        if($this->_getCurrentSetting('disableMultiAccess',$surveyId) && $oResponse && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyId,$oResponse->id))) {
+        if($this->_getCurrentSetting('multiAccessTime',$surveyId) && $oResponse && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyId,$oResponse->id))) {
             $this->_endWithEditionMessage($since);
         }
         \reloadAnyResponse\models\surveySession::saveSessionTime($surveyId,$oResponse->id);
@@ -451,7 +451,7 @@ class reloadAnyResponse extends PluginBase {
         if($multiAccessTime !== '') {
             Yii::app()->setConfig('surveysessiontime_limit',$multiAccessTime);
         }
-        $disableMultiAccess = $this->_getCurrentSetting('disableMultiAccess',$surveyid);
+        $disableMultiAccess = true;
         if($multiAccessTime === '0') {
             $disableMultiAccess = false;
         }
@@ -604,15 +604,18 @@ class reloadAnyResponse extends PluginBase {
             $tableName = $this->api->getTable($this,'surveySession')->tableName();
             Yii::app()->getDb()->createCommand()->alterColumn($tableName,'sid','int not NULL');
             Yii::app()->getDb()->createCommand()->alterColumn($tableName,'srid','int not NULL');
-            Yii::app()->getDb()->createCommand()->dropPrimaryKey('surveysession_sidsrid',$tableName);
-            Yii::app()->getDb()->createCommand()->addPrimaryKey('surveysession_sidsrid',$tableName,'sid,srid');
-
+            $tableSchema = App()->getDb()->getSchema()->getTable($tableName);
+            if(empty($tableSchema->primaryKey)) {
+                Yii::app()->getDb()->createCommand()->addPrimaryKey('surveysession_sidsrid',$tableName,'sid,srid');
+            }
             $tableName = $this->api->getTable($this,'responseLink')->tableName();
             Yii::app()->getDb()->createCommand()->alterColumn($tableName,'sid','int not NULL');
             Yii::app()->getDb()->createCommand()->alterColumn($tableName,'srid','int not NULL');
-            Yii::app()->getDb()->createCommand()->dropPrimaryKey('responselink_sidsrid',$tableName);
-            Yii::app()->getDb()->createCommand()->addPrimaryKey('responselink_sidsrid',$tableName,'sid,srid');
-            $this->set("dbVersion",2);
+            $tableSchema = App()->getDb()->getSchema()->getTable($tableName);
+            if(empty($tableSchema->primaryKey)) {
+                Yii::app()->getDb()->createCommand()->addPrimaryKey('responselink_sidsrid',$tableName,'sid,srid');
+            }
+            $this->set("dbVersion",self::$dbVersion);
         }
         if($this->get("dbVersion") < 2 ) {
             $tableName = $this->api->getTable($this,'surveySession')->tableName();

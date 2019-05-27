@@ -1,7 +1,7 @@
 <?php
 /**
  * This file is part of reloadAnyResponse plugin
- * @version 1.0.2
+ * @version 1.2.0
  */
 namespace reloadAnyResponse\models;
 use Yii;
@@ -23,8 +23,6 @@ class surveySession extends CActiveRecord
 
     /* @const integer The max time for session, if it's not set in session or by server (0 in session_time_limit) */
     const maxSessionTime = 30;
-    /* @const integer The max session id number to keep */
-    const KeepSessionNumber = 40;
 
     /** @inheritdoc */
     public static function model($className=__CLASS__) {
@@ -102,8 +100,7 @@ class surveySession extends CActiveRecord
             $oSessionSurvey->token = $token;
         }
         $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
-        $oSessionSurvey->session = Yii::app()->getSession()->getSessionID();
-        self::addCurrrentSessionInPrevious(Yii::app()->getSession()->getSessionID());
+        $oSessionSurvey->session = self::getSessionId();
         $oSessionSurvey->save();
         return $oSessionSurvey;
     }
@@ -137,16 +134,15 @@ class surveySession extends CActiveRecord
             return null;
         }
         /* Same session : save time and quit */
-        if($oSessionSurvey->session == Yii::app()->getSession()->getSessionID()) {
+        if($oSessionSurvey->session == self::getSessionId()) {
             $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
-            self::addCurrrentSessionInPrevious(Yii::app()->getSession()->getSessionID());
             $oSessionSurvey->save();
             return null;
         }
         /* In previous sessions : save time and quit */
         $previousSessionId = (array) Yii::app()->session['previousSessionId'];
         if(in_array($oSessionSurvey->session,$previousSessionId)) {
-            $oSessionSurvey->session = Yii::app()->getSession()->getSessionID();
+            $oSessionSurvey->session = self::getSessionId();
             $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
             $oSessionSurvey->save();
             return null;
@@ -168,26 +164,13 @@ class surveySession extends CActiveRecord
 
     /**
      * try to keep previous session in session …
+     * @deprecated
      * @param string $sessionId, ifb not set : current one
      * @return void
      */
     public static function addCurrrentSessionInPrevious($sessionId=null)
     {
-        $previousSessionIds = Yii::app()->session['previousSessionId'];
-        if(empty($previousSessionIds)) {
-            $previousSessionIds = array();
-        }
-        if(empty($sessionId)) {
-            $sessionId = Yii::app()->getSession()->getSessionID();
-        }
-        if(!in_array($sessionId,$previousSessionIds)) {
-            $previousSessionIds[] = $sessionId;
-        }
-        $previousSessionIds = array_unique($previousSessionIds);
-        if(count($previousSessionIds) > self::KeepSessionNumber ) {
-            array_shift($previousSessionIds);
-        }
-        Yii::app()->session['previousSessionId'] = $previousSessionIds;
+        // Deprecated function
     }
 
     /**
@@ -207,5 +190,17 @@ class surveySession extends CActiveRecord
             ),
         );
         return $aRules;
+    }
+
+    /**
+     * Generate an random unique id for the session
+     * @return string
+     */
+    private static function getSessionId()
+    {
+        if(empty(Yii::app()->session['reloadAnyResponseSessionId'])) {
+            Yii::app()->session['reloadAnyResponseSessionId'] = uniqid(Yii::app()->getSecurityManager()->generateRandomString('42'),true);
+        }
+        return Yii::app()->session['reloadAnyResponseSessionId'];
     }
 }
