@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.1.0
+ * @version 1.1.1
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -155,6 +155,9 @@ class reloadAnyResponse extends PluginBase {
   /** @inheritdoc **/
   public function init()
   {
+    if (Yii::app() instanceof CConsoleApplication) {
+      return;
+    }
     $this->subscribe('beforeActivate');
     $oPlugin = Plugin::model()->find("name = :name",array("name"=>get_class($this)));
     if($oPlugin && $oPlugin->active) {
