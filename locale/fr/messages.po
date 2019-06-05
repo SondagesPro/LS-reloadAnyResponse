@@ -1,15 +1,15 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: reloadAnyResponse\n"
-"POT-Creation-Date: 2018-08-31 10:28+0200\n"
-"PO-Revision-Date: 2018-08-31 10:29+0200\n"
+"POT-Creation-Date: 2019-06-05 10:59+0200\n"
+"PO-Revision-Date: 2019-06-05 10:59+0200\n"
 "Last-Translator: Denis Chenu <contact@sondages.pro>\n"
 "Language-Team: \n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 2.1.1\n"
+"X-Generator: Poedit 2.2.3\n"
 "X-Poedit-Basepath: ..\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "X-Poedit-KeywordsList: gT\n"
@@ -17,26 +17,26 @@ msgstr ""
 "X-Poedit-SearchPath-0: .\n"
 "X-Poedit-SearchPathExcluded-0: locale\n"
 
-#: reloadAnyResponse.php:162
+#: reloadAnyResponse.php:212
 msgid "Allow admin user to reload any response with response id."
 msgstr ""
 "Permettre aux administrateurs de charger n‘importe quelle réponse avec "
 "l‘identifiant de réponse."
 
-#: reloadAnyResponse.php:168 reloadAnyResponse.php:181
-#: reloadAnyResponse.php:193 reloadAnyResponse.php:205
-#: reloadAnyResponse.php:214
+#: reloadAnyResponse.php:218 reloadAnyResponse.php:231
+#: reloadAnyResponse.php:243 reloadAnyResponse.php:255
+#: reloadAnyResponse.php:264
 #, php-format
 msgid "Use default (%s)"
 msgstr "Utiliser le défaut (%s)"
 
-#: reloadAnyResponse.php:174
+#: reloadAnyResponse.php:224
 msgid "Allow participant with token to create or reload responses."
 msgstr ""
 "Permettre au participant avec un code d‘invitation de créer ou éditer leurs "
 "réponses."
 
-#: reloadAnyResponse.php:175
+#: reloadAnyResponse.php:225
 msgid ""
 "Related to “Enable token-based response persistence” and “Allow multiple "
 "responses or update responses” survey settings."
@@ -44,19 +44,19 @@ msgstr ""
 "Lié à «Activer la persistance des réponses basée sur les codes d’invitation» "
 "et «Permettre les réponses multiples ou les mises à jour de réponses»"
 
-#: reloadAnyResponse.php:187
+#: reloadAnyResponse.php:237
 msgid "Create unique code automatically."
 msgstr "Créer le code unique automatiquement."
 
-#: reloadAnyResponse.php:199
+#: reloadAnyResponse.php:249
 msgid "Allow using unique code if exist."
 msgstr "Permettre d‘utiliser le code unique si il existe."
 
-#: reloadAnyResponse.php:211
+#: reloadAnyResponse.php:261
 msgid "Time for disable multiple access (in minutes)."
 msgstr "Délais de protection des accès multiples (en minutes)."
 
-#: reloadAnyResponse.php:352
+#: reloadAnyResponse.php:467
 msgid ""
 "We save your current session, you can try to reload the survey in some "
 "minutes."
@@ -64,23 +64,23 @@ msgstr ""
 "Nous enregistrons votre session actuelle, vous pouvez réessayer de charger "
 "ce questionnaire dans quelques minutes."
 
-#: reloadAnyResponse.php:386
+#: reloadAnyResponse.php:501
 msgid "Sorry, this response didn‘t exist."
 msgstr "Désolé, cette réponse n‘existe pas."
 
-#: reloadAnyResponse.php:389
+#: reloadAnyResponse.php:504
 msgid "Sorry, this access code is invalid."
 msgstr "Désolé, ce code d‘accès est invalide."
 
-#: reloadAnyResponse.php:522
+#: reloadAnyResponse.php:688
 msgid "Response not found."
 msgstr "Cette réponse n‘à pas était trouvée."
 
-#: reloadAnyResponse.php:528
+#: reloadAnyResponse.php:694
 msgid "Access to this response need a valid token."
 msgstr "L‘accès à cette réponse nécessite un code d‘invitation valide."
 
-#: reloadAnyResponse.php:669
+#: reloadAnyResponse.php:839
 #, php-format
 msgid ""
 "Sorry, someone update this response to the questionnaire a short time ago. "

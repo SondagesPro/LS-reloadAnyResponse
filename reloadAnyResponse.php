@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.1.1
+ * @version 1.1.2
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -159,10 +159,8 @@ class reloadAnyResponse extends PluginBase {
       return;
     }
     $this->subscribe('beforeActivate');
-    $oPlugin = Plugin::model()->find("name = :name",array("name"=>get_class($this)));
-    if($oPlugin && $oPlugin->active) {
-      $this->_setConfig();
-    }
+    /* Register language string */
+    $this->subscribe('afterPluginLoad');
     /* Managing unique code for Response and SurveyDynamic */
     $this->subscribe('afterModelSave');
     $this->subscribe('afterModelDelete');
@@ -635,6 +633,14 @@ class reloadAnyResponse extends PluginBase {
         $this->set("dbVersion",self::$dbVersion);
     }
 
+    /**
+     * Add this translation just after loaded all plugins
+     * @see event afterPluginLoad
+     */
+    public function afterPluginLoad(){
+        $this->_setConfig();
+    }
+
   /**
    * Add needed alias and put it in autoloader,
    * add surveysessiontime_limit to global config
@@ -653,14 +659,14 @@ class reloadAnyResponse extends PluginBase {
     }
     $messageSource=array(
         'class' => 'CGettextMessageSource',
-        //'cacheID' => get_class($this).'Lang',
-        'cachingDuration'=>3600,
+        'cacheID' => get_class($this).'Lang',
+        'cachingDuration'=>0,
         'forceTranslation' => true,
         'useMoFile' => true,
         'basePath' => __DIR__ . DIRECTORY_SEPARATOR.'locale',
         'catalog'=>'messages',// default from Yii
     );
-    Yii::app()->setComponent(get_class($this).'Lang',$messageSource);
+    Yii::app()->setComponent(get_class($this).'Messages',$messageSource);
   }
 
   /**
@@ -879,7 +885,7 @@ class reloadAnyResponse extends PluginBase {
      * @return string
      */
     private function _translate($string, $language = null){
-        $messageSource = get_class($this).'Lang';
+        $messageSource = get_class($this).'Messages';
         return Yii::t('',$string,array(),$messageSource);
     }
 
