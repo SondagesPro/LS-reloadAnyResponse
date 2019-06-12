@@ -1,7 +1,7 @@
 <?php
 /**
  * This file is part of reloadAnyResponse plugin
- * @version 1.2.0
+ * @version 1.2.1
  */
 namespace reloadAnyResponse\models;
 use Yii;
@@ -75,8 +75,7 @@ class surveySession extends CActiveRecord
         if(!$srid && !$token) {
             return;
         }
-        $oSurvey = Survey::model()->findByPk($sid);
-        if($oSurvey->getHasTokensTable()) {
+        if(self::surveyHasTokenTable($sid)) {
             if(!$token) {
                 $token = isset($_SESSION['survey_'.$sid]['token']) ? $_SESSION['survey_'.$sid]['token'] : null;
             }
@@ -202,5 +201,18 @@ class surveySession extends CActiveRecord
             Yii::app()->session['reloadAnyResponseSessionId'] = uniqid(Yii::app()->getSecurityManager()->generateRandomString('42'),true);
         }
         return Yii::app()->session['reloadAnyResponseSessionId'];
+    }
+
+    /**
+     * Replace getHasTokensTable for 2.X compat
+     * @param $surveyId
+     * @return boolean
+     */
+    private static function surveyHasTokenTable($surveyId) {
+        if(intval(App()->getConfig('versionnumber')) >=3) {
+            return Survey::model()->findByPk($surveyId)->getHasTokensTable();
+        }
+        Yii::import('application.helpers.common_helper', true);
+        return tableExists("{{tokens_".$surveyId."}}");
     }
 }
