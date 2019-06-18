@@ -84,7 +84,7 @@ class surveySession extends CActiveRecord
             }
             if(!$token) {
                 $oResponse = Response::model($sid)->findByPk($srid);
-                if($oResponse && $oSurvey->anonymized != "N" && !empty($oResponse->token)) {
+                if($oResponse && Survey::model()->findByPk($sid)->anonymized != "N" && !empty($oResponse->token)) {
                     $token = $oResponse->token;
                 }
             }
