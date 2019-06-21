@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.2.0
+ * @version 1.2.1
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -556,7 +556,6 @@ class reloadAnyResponse extends PluginBase {
         $ajaxUrl = Yii::app()->getController()->createUrl('plugins/direct', array('plugin' => get_class($this), 'function' => 'close','sid'=>$surveyId,'srid'=>$responseId));
         $onBeforeUnload = "window.onbeforeunload = function(e) {\n";
         $onBeforeUnload .= " jQuery.ajax({ url:'{$ajaxUrl}' });\n";
-        $onBeforeUnload .= " return null;\n";
         $onBeforeUnload .= "}\n";
         Yii::app()->getClientScript()->registerScript("reloadAnyResponseBeforeUnload",$onBeforeUnload,CClientScript::POS_HEAD);
     }
