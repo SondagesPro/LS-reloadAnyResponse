@@ -59,6 +59,21 @@ Sample usage
 
 If `$iResponse` is null : get the current response id from `$_SESSION`. The plugin use this model in beforeSurveyPage event if _Time for disable multiple access (in minutes)_ is not empty.
 
+### reloadResponse helper
+
+- This allow to reload any response by another plugin.
+- **Warning** no control‘s on right or token are done by this helper, you must control rights in your plugin
+- Constructor need surveyid and reponse id and optionnal language
+- Start a survey with startSurvey function. Parameters was
+    - `$step` The step where to start survey, null get the default from response, false start at 1st page.
+    - `$resetSubmit` reset the submit date, by default reset if needed (Allow edit after completion is disabled).
+
+Sample usage in beforeSurveyPage for example.
+````
+    $reloadReponse = new \reloadAnyResponse\helpers\reloadResponse($surveyId, $srid);
+    $reloadReponse->startSurvey($step);
+````
+
 ## Contribute and issue
 
 Contribution are welcome, for patch and issue : use [gitlab]( https://gitlab.com/SondagesPro/coreAndTools/reloadAnyResponse).
