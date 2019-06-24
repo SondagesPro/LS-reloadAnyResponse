@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.2.1
+ * @version 1.3.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -184,6 +184,21 @@ class reloadAnyResponse extends PluginBase {
     $this->subscribe("newDirectRequest",'newDirectRequest');
     /* redirect to editing survey */
     $this->subscribe("beforeControllerAction",'beforeControllerAction');
+
+    /* Logout remove all session, survey too, then must delete current related surveySessionId */
+    $this->subscribe("beforeLogout","deleteAllBySessionId");
+  }
+
+  /**
+   * Delete all related current survey session from this user
+   * @return @void
+   */
+  public function deleteAllBySessionId()
+  {
+    if($this->getEvent()->getEventName() != "beforeLogout") {
+      return;
+    }
+    \reloadAnyResponse\models\surveySession::deleteAllBySessionId();
   }
 
   /** @inheritdoc **/

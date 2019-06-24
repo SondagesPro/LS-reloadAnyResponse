@@ -1,7 +1,7 @@
 <?php
 /**
  * This file is part of reloadAnyResponse plugin
- * @version 1.2.1
+ * @version 1.3.0
  */
 namespace reloadAnyResponse\models;
 use Yii;
@@ -53,12 +53,6 @@ class surveySession extends CActiveRecord
     {
         return array('sid', 'srid');
     }
-
-    /** @inheritdoc */
-    /** @todo */
-    //~ public function rules()
-    //~ {
-    //~ }
 
     /**
      * Return (or create) self
@@ -201,6 +195,18 @@ class surveySession extends CActiveRecord
             Yii::app()->session['reloadAnyResponseSessionId'] = uniqid(Yii::app()->getSecurityManager()->generateRandomString('42'),true);
         }
         return Yii::app()->session['reloadAnyResponseSessionId'];
+    }
+
+    /**
+     * Delete all current survey
+     * @return void
+     */
+    public static function deleteAllBySessionId()
+    {
+        if(empty(self::getSessionId())) {
+            return;
+        }
+        self::model()->deleteAll("session = :session",array(':session'=>self::getSessionId()));
     }
 
     /**
