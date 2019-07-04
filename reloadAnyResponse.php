@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.3.0
+ * @version 1.3.1
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -930,7 +930,7 @@ class reloadAnyResponse extends PluginBase {
             // Unable to do own system
             throw new CHttpException($errorCode, $errorMessage);
         }
-        if(version_compare($limesurveyVersion,"3.0.0")) {
+        if(version_compare($limesurveyVersion,"3.0.0",'>=')) {
             header($_SERVER["SERVER_PROTOCOL"]." ".$errorCodeHeader[$errorCode],true,$errorCode);
             Yii::app()->twigRenderer->renderTemplateFromFile("layout_errors.twig",
                 array('aSurveyInfo' =>array(
