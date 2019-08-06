@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.3.1
+ * @version 1.3.2
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -438,7 +438,7 @@ class reloadAnyResponse extends PluginBase {
     }
     /* control multi access to token with token and allow edit reponse */
     $oSurvey = Survey::model()->findByPk($surveyId);
-    if($oSurvey && $oSurvey->alloweditaftercompletion == "Y" && $oSurvey->tokenanswerspersistence == "Y") {
+    if($oSurvey && $oSurvey->tokenanswerspersistence == "Y") {
         /* Get like limesurvey (in this situation) : get the last srid with this token (without plugin …) */
         $oResponse = Response::model($surveyId)->find(array(
             'select' => 'id',
@@ -446,10 +446,12 @@ class reloadAnyResponse extends PluginBase {
             'order' => 'id DESC',
             'params' => array('token' => $token)
         ));
-        if($this->_getCurrentSetting('multiAccessTime',$surveyId) && $oResponse && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyId,$oResponse->id))) {
-            $this->_endWithEditionMessage($since);
+        if($oSurvey->alloweditaftercompletion == "Y" || empty($oResponse->submitdate)) {
+            if($this->_getCurrentSetting('multiAccessTime',$surveyId) && $oResponse && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyId,$oResponse->id))) {
+                $this->_endWithEditionMessage($since);
+            }
+            \reloadAnyResponse\models\surveySession::saveSessionTime($surveyId,$oResponse->id);
         }
-        \reloadAnyResponse\models\surveySession::saveSessionTime($surveyId,$oResponse->id);
     }
     /* @todo : control what happen with useleft > 1 and tokenanswerspersistence != "Y" */
 
