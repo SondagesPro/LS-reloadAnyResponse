@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.3.2
+ * @version 1.3.3.beta
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -125,25 +125,36 @@ class reloadAnyResponse extends PluginBase {
             'min'=>1,
             'placeholder'=>'Disable',
         ),
-        'default' => 30,
+        'default' => "",
     ),
-    //~ 'multiAccessTimeOptOut'=>array(
-        //~ 'type'=>'int',
-        //~ 'label' => 'Auto save and close current responses (with a javascript solution) in minutes.',
-        //~ 'help' => 'If user didn‘t do any action on his browser during access time, save and close the windows. Set to an empty disable this feature.',
+    'multiAccessTimeOptOut'=>array(
+        'type'=>'int',
+        'label' => 'Auto save and close current responses (with a javascript solution) in minutes.',
+        'help' => 'If user didn‘t do any action on his browser during access time, save and show information. Set to an empty disable this feature.',
+        'htmlOptions'=>array(
+            'min'=>1,
+            'placeholder'=>'Disable',
+        ),
+        'default' => "",
+    ),
+    'multiAccessTimeAlert'=>array(
+        'type'=>'int',
+        'label' => 'Time for alert shown for optout of survey (before survey is saved)',
+        'help' => 'Set to empty to disable. This alert is shown after X minutes, where X is the number here.',
+        'htmlOptions'=>array(
+            'min'=>1,
+            'placeholder'=>'Disable',
+        ),
+        'default' => "",
+    ),
+    //~ 'multiAccessSaveNotcomplete'=>array(
+        //~ 'type'=>'select',
+        //~ 'label' => 'Reset completed survey as not completed when save',
         //~ 'htmlOptions'=>array(
-            //~ 'min'=>1,
+            //~ 1=>"Yes",
+            //~ 0=>"No",
         //~ ),
-        //~ 'default' => 20,
-    //~ ),
-    //~ 'multiAccessTimeAlert'=>array(
-        //~ 'type'=>'int',
-        //~ 'label' => 'Time for alert shown for optout of survey',
-        //~ 'help' => 'Set to empty to disable. This alert is shown after X minutes, where X is the number here.',
-        //~ 'htmlOptions'=>array(
-            //~ 'min'=>1,
-        //~ ),
-        //~ 'default' => 18,
+        //~ 'default' => 1,
     //~ ),
     //~ 'uniqueCodeCode' => array(
         //~ 'type'=>'string',
@@ -205,6 +216,7 @@ class reloadAnyResponse extends PluginBase {
   public function getPluginSettings($getValues=true)
   {
     /* @todo translation of label and help */
+    /* @todo Set disable multi access related to session gc */
     return parent::getPluginSettings($getValues);
   }
 
@@ -218,6 +230,8 @@ class reloadAnyResponse extends PluginBase {
     $uniqueCodeCreateDefault = $this->get('uniqueCodeCreate',null,null,$this->settings['uniqueCodeCreate']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeAccessDefault = $this->get('uniqueCodeAccess',null,null,$this->settings['uniqueCodeAccess']['default']) ? gT('Yes') : gT('No');
     $multiAccessTimeDefault = $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) ? $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) : gT('Disable');
+    $multiAccessTimeOptOutDefault = $this->get('multiAccessTimeOptOut',null,null,$this->settings['multiAccessTimeOptOut']['default']) ? $this->get('multiAccessTimeOptOut',null,null,$this->settings['multiAccessTimeOptOut']['default']) : gT('Disable');
+    $multiAccessTimeAlertDefault = $this->get('multiAccessTimeAlert',null,null,$this->settings['multiAccessTimeAlert']['default']) ? $this->get('multiAccessTimeAlert',null,null,$this->settings['multiAccessTime']['default']) : gT('Disable');
 
     $oEvent->set("surveysettings.{$this->id}", array(
       'name' => get_class($this),
@@ -279,6 +293,26 @@ class reloadAnyResponse extends PluginBase {
             'placeholder' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$multiAccessTimeDefault)),
           ),
           'current'=>$this->get('multiAccessTime','Survey',$oEvent->get('survey'),"")
+        ),
+        'multiAccessTimeOptOut'=>array(
+          'type'=>'int',
+          'label'=> $this->_translate("Auto save and close current responses (with a javascript solution) in minutes."),
+          'help' => $this->_translate("Use 0 to disable. This show a static page to user after save."),
+          'htmlOptions'=>array(
+            'min'=>0,
+            'placeholder' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$multiAccessTimeOptOutDefault)),
+          ),
+          'current'=>$this->get('multiAccessTimeOptOut','Survey',$oEvent->get('survey'),"")
+        ),
+        'multiAccessTimeAlert'=>array(
+          'type'=>'int',
+          'label'=>$this->_translate("Time for alert shown for optout of survey (before survey is saved)"),
+          'help' => $this->_translate("Use 0 to disable."),
+          'htmlOptions'=>array(
+            'min'=>0,
+            'placeholder' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$multiAccessTimeAlertDefault)),
+          ),
+          'current'=>$this->get('multiAccessTimeAlert','Survey',$oEvent->get('survey'),"")
         ),
       ),
     ));
@@ -470,7 +504,7 @@ class reloadAnyResponse extends PluginBase {
             Yii::app()->setConfig('surveysessiontime_limit',$multiAccessTime);
         }
         $disableMultiAccess = true;
-        if($multiAccessTime === '0') {
+        if($multiAccessTime === '0' /* disable by survey */|| $multiAccessTime === ''/* disable globally */) {
             $disableMultiAccess = false;
         }
         $this->_fixLanguage($surveyid);
@@ -695,7 +729,6 @@ class reloadAnyResponse extends PluginBase {
    */
   private function _loadReponse($surveyid,$srid,$token = null)
   {
-
     if(isset($_SESSION['survey_'.$surveyid]['srid']) && $_SESSION['survey_'.$surveyid]['srid'] == $srid) {
       return;
     }
@@ -711,8 +744,7 @@ class reloadAnyResponse extends PluginBase {
         $this->_HttpException(401, $this->_translate('Access to this response need a valid token.'),$surveyid);
       }
     }
-    killSurveySession($surveyid); // Is this needed ?
-    LimeExpressionManager::SetDirtyFlag();
+
     $_SESSION['survey_'.$surveyid]['srid'] = $oResponse->id;
     if (!empty($oResponse->lastpage)) {
         $_SESSION['survey_'.$surveyid]['LEMtokenResume'] = true;
