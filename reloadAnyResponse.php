@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.3.3.beta
+ * @version 1.4.0.beta
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -127,7 +127,7 @@ class reloadAnyResponse extends PluginBase {
         ),
         'default' => "",
     ),
-    'multiAccessTimeOptOut'=>array(
+    'multiAccessTimeOut'=>array(
         'type'=>'int',
         'label' => 'Auto save and close current responses (with a javascript solution) in minutes.',
         'help' => 'If user didn‘t do any action on his browser during access time, save and show information. Set to an empty disable this feature.',
@@ -195,6 +195,8 @@ class reloadAnyResponse extends PluginBase {
     $this->subscribe("newDirectRequest",'newDirectRequest');
     /* redirect to editing survey */
     $this->subscribe("beforeControllerAction",'beforeControllerAction');
+    /* For view (alert before save) */
+    $this->subscribe('getPluginTwigPath');
 
     /* Logout remove all session, survey too, then must delete current related surveySessionId */
     $this->subscribe("beforeLogout","deleteAllBySessionId");
@@ -230,7 +232,7 @@ class reloadAnyResponse extends PluginBase {
     $uniqueCodeCreateDefault = $this->get('uniqueCodeCreate',null,null,$this->settings['uniqueCodeCreate']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeAccessDefault = $this->get('uniqueCodeAccess',null,null,$this->settings['uniqueCodeAccess']['default']) ? gT('Yes') : gT('No');
     $multiAccessTimeDefault = $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) ? $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) : gT('Disable');
-    $multiAccessTimeOptOutDefault = $this->get('multiAccessTimeOptOut',null,null,$this->settings['multiAccessTimeOptOut']['default']) ? $this->get('multiAccessTimeOptOut',null,null,$this->settings['multiAccessTimeOptOut']['default']) : gT('Disable');
+    $multiAccessTimeOutDefault = $this->get('multiAccessTimeOut',null,null,$this->settings['multiAccessTimeOut']['default']) ? $this->get('multiAccessTimeOut',null,null,$this->settings['multiAccessTimeOut']['default']) : gT('Disable');
     $multiAccessTimeAlertDefault = $this->get('multiAccessTimeAlert',null,null,$this->settings['multiAccessTimeAlert']['default']) ? $this->get('multiAccessTimeAlert',null,null,$this->settings['multiAccessTime']['default']) : gT('Disable');
 
     $oEvent->set("surveysettings.{$this->id}", array(
@@ -294,15 +296,15 @@ class reloadAnyResponse extends PluginBase {
           ),
           'current'=>$this->get('multiAccessTime','Survey',$oEvent->get('survey'),"")
         ),
-        'multiAccessTimeOptOut'=>array(
+        'multiAccessTimeOut'=>array(
           'type'=>'int',
           'label'=> $this->_translate("Auto save and close current responses (with a javascript solution) in minutes."),
           'help' => $this->_translate("Use 0 to disable. This show a static page to user after save."),
           'htmlOptions'=>array(
             'min'=>0,
-            'placeholder' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$multiAccessTimeOptOutDefault)),
+            'placeholder' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$multiAccessTimeOutDefault)),
           ),
-          'current'=>$this->get('multiAccessTimeOptOut','Survey',$oEvent->get('survey'),"")
+          'current'=>$this->get('multiAccessTimeOut','Survey',$oEvent->get('survey'),"")
         ),
         'multiAccessTimeAlert'=>array(
           'type'=>'int',
@@ -491,18 +493,61 @@ class reloadAnyResponse extends PluginBase {
 
   }
 
+    /**
+     * Add the javascript solution for save survey
+     **/
+    public function addAccessTimeOutScript($surveyId)
+    {
+        $multiAccessTime = $this->_getCurrentSetting('multiAccessTime',$surveyId);
+        $multiAccessTimeOut = $this->_getCurrentSetting('multiAccessTimeOut',$surveyId);
+        $multiAccessTimeAlert = $this->_getCurrentSetting('multiAccessTimeAlert',$surveyId);
+        if(empty($multiAccessTimeOut)) {
+            return;
+        }
+        $aData = array(
+            'lang'=> array(
+                'warning' => $this->_translate("Warning!"),
+                'windowclosewithtimer' => sprintf($this->_translate("This window will close in %s minute(s). Current response will be saved as uncomplete."),"<span data-reloadany-timecounter=1></span>"),
+            ),
+        );
+        if(version_compare(Yii::app()->getConfig('versionnumber'),"3",">=")) {
+            $aData['aSurveyInfo'] = getSurveyInfo($surveyId, App()->getLanguage());
+            $surveyTimeOutAlert = Yii::app()->twigRenderer->renderPartial('/subviews/messages/surveyTimeOutAlert.twig', $aData);
+        } else {
+            Yii::setPathOfAlias(get_class($this), dirname(__FILE__));
+            $surveyTimeOutAlert = Yii::app()->getController()->renderPartial(get_class($this).".views.surveyTimeOutAlert",$aData,true);
+        }
+        $modalScript = "$('body').prepend(".json_encode($surveyTimeOutAlert).");\n";
+        Yii::app()->getClientScript()->registerScript("multiAccessTimeOutModal",$modalScript,CClientScript::POS_READY);
+        $jsonOption = array(
+            'multiAccessTime' => $multiAccessTime,
+            'multiAccessTimeOut' => $multiAccessTimeOut,
+            'multiAccessTimeAlert' => ($multiAccessTimeOut - $multiAccessTimeAlert) > 0 ? ($multiAccessTimeOut - $multiAccessTimeAlert) : 0,
+        );
+        App()->getClientScript()->registerScriptFile(Yii::app()->assetManager->publish(dirname(__FILE__) . '/assets/reloadAnyResponse.js'));
+        Yii::app()->getClientScript()->registerScript("multiAccessTimeOutInit","window.ReloadAnyResponse.init(".json_encode($jsonOption).")\n;",CClientScript::POS_READY);/* Check with ajax mode …*/
+    }
+
+    /* @see plugin event */
+    public function getPluginTwigPath() 
+    {
+        $viewPath = dirname(__FILE__)."/views";
+        $this->getEvent()->append('add', array($viewPath));
+    }
+
     /** @inheritdoc **/
     public function beforeSurveyPage()
     {
         /* Save current session Id to allow same user to reload survey in same browser */
         /* resetAllSessionVariables regenerate session id */
         /* Keep previous session id, if user reload start url it reset the sessionId, need to leav access */
-
         $surveyid = $this->getEvent()->get('surveyId');
         $multiAccessTime = $this->_getCurrentSetting('multiAccessTime',$surveyid);
         if($multiAccessTime !== '') {
             Yii::app()->setConfig('surveysessiontime_limit',$multiAccessTime);
         }
+        $this->addAccessTimeOutScript($surveyid);
+
         $disableMultiAccess = true;
         if($multiAccessTime === '0' /* disable by survey */|| $multiAccessTime === ''/* disable globally */) {
             $disableMultiAccess = false;
@@ -531,7 +576,7 @@ class reloadAnyResponse extends PluginBase {
         $oSurvey = Survey::model()->findByPk($surveyid);
         $token = App()->getRequest()->getParam('token');
         if($srid == "new") {
-            // Done in beforeLoadResponse
+            // Done in beforeLoadResponse for token or not without.
           return;
         }
         if(!$srid) {
