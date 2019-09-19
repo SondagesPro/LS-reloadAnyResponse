@@ -1,5 +1,5 @@
 /**
- * Javascript for reload any respopnse
+ * Javascript for reload any response
  * @author Denis Chenu <https://sondages.pro
  * @license magnet:?xt=urn:btih:c80d50af7d3db9be66a4d0a86db0286e4fd33292&dn=bsd-3-clause.txt BSD 3 Clause
  */
@@ -19,8 +19,13 @@ var ReloadAnyResponse = {
         });
         this.AccessTimeOptOutReset();
     },
+    AccessTimeOptOutAlert: function() {
+        $("#modal-reloadany-timer").modal('show');
+    },
     AccessTimeOptOut: function() {
-
+        $("form#limesurvey").append("<input type='hidden' name='reloadany-autosave' value='1'>");
+        $("form#limesurvey").append("<button type='submit' name='saveall' value='saveall' class='hidden' data-disable-check-validity=1>");
+        $("form#limesurvey [name='saveall']").last().click();
     },
     AccessTimeOptOutReset: function() {
         var context = this;
@@ -36,36 +41,12 @@ var ReloadAnyResponse = {
             return;
         }
         this.idleTime = this.idleTime + 1;
-        console.warn([
-            ReloadAnyResponse.idleTime,
-            ReloadAnyResponse.surveyTimeOutAlert,
-            ReloadAnyResponse.surveyTimeOut
-        ]);
         $("[data-reloadany-timecounter]").text( this.surveyTimeOut - this.idleTime );
         if(this.surveyTimeOutAlert && this.surveyTimeOutAlert <= this.idleTime) {
-            $("#modal-reloadany-timer").modal('show');
+            this.AccessTimeOptOutAlert();
         }
         if(this.surveyTimeOut && this.surveyTimeOut <= this.idleTime) {
-            $("form#limesurvey").append("<input type='hidden' name='autosave' value='1'>");
-            $("form#limesurvey").append("<button type='submit' name='saveall' value='saveall' class='hidden' data-disable-check-validity=1>");
-            $("form#limesurvey [name='saveall']").last().click();
+            this.AccessTimeOptOut();
         }
     }
 }
-
-/**
-
-
-function timerIncrement() {
-    idleTime = idleTime + 1;
-    $("#timer-minutes").text( window.oecdVar.surveyTimeOut - idleTime );
-    if(window.oecdVar.surveyTimeOutAlert!=="") {
-        if(window.oecdVar.surveyTimeOutAlert <= idleTime) {
-            $("#modal-timer").modal('show');
-        } else {
-            //$("#modal-timer").modal('hide');
-        }
-    }
-
-}
-**/

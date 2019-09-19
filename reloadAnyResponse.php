@@ -147,15 +147,16 @@ class reloadAnyResponse extends PluginBase {
         ),
         'default' => "",
     ),
-    //~ 'multiAccessSaveNotcomplete'=>array(
-        //~ 'type'=>'select',
-        //~ 'label' => 'Reset completed survey as not completed when save',
-        //~ 'htmlOptions'=>array(
-            //~ 1=>"Yes",
-            //~ 0=>"No",
-        //~ ),
-        //~ 'default' => 1,
-    //~ ),
+    'multiAccessTimeOutSaveQuit'=>array(
+        'type'=>'select',
+        'label' => 'Quit after save',
+        'options'=>array(
+            0=>"Never",
+            1=>"With autosave",
+            2=>"Always",
+        ),
+        'default' => 1,
+    ),
     //~ 'uniqueCodeCode' => array(
         //~ 'type'=>'string',
         //~ 'label'=>"Code in GET params to test.",
@@ -219,6 +220,7 @@ class reloadAnyResponse extends PluginBase {
   {
     /* @todo translation of label and help */
     /* @todo Set disable multi access related to session gc */
+    /* @todo : show warning for rendserMessage */
     return parent::getPluginSettings($getValues);
   }
 
@@ -228,13 +230,27 @@ class reloadAnyResponse extends PluginBase {
     $oEvent = $this->event;
     /* currentDefault translation */
     $allowAdminUserDefault = $this->get('allowAdminUser',null,null,$this->settings['allowAdminUser']['default']) ? gT('Yes') : gT('No');
+    $replaceEditResponseDefault = $this->get('replaceEditResponse',null,null,$this->settings['replaceEditResponse']['default']) ? gT('Yes') : gT('No');
     $allowTokenDefault = $this->get('allowTokenUser',null,null,$this->settings['allowTokenUser']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeCreateDefault = $this->get('uniqueCodeCreate',null,null,$this->settings['uniqueCodeCreate']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeAccessDefault = $this->get('uniqueCodeAccess',null,null,$this->settings['uniqueCodeAccess']['default']) ? gT('Yes') : gT('No');
     $multiAccessTimeDefault = $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) ? $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) : gT('Disable');
     $multiAccessTimeOutDefault = $this->get('multiAccessTimeOut',null,null,$this->settings['multiAccessTimeOut']['default']) ? $this->get('multiAccessTimeOut',null,null,$this->settings['multiAccessTimeOut']['default']) : gT('Disable');
     $multiAccessTimeAlertDefault = $this->get('multiAccessTimeAlert',null,null,$this->settings['multiAccessTimeAlert']['default']) ? $this->get('multiAccessTimeAlert',null,null,$this->settings['multiAccessTime']['default']) : gT('Disable');
-
+    $multiAccessTimeOutSaveQuitDefault = $this->get('multiAccessTimeOutSaveQuit',null,null,$this->settings['multiAccessTimeOutSaveQuit']['default']);
+    switch($multiAccessTimeOutSaveQuitDefault) {
+        case 0:
+            $multiAccessTimeOutSaveQuitDefault = $this->_translate("Never");
+            break;
+        case 1:
+            $multiAccessTimeOutSaveQuitDefault = $this->_translate("With autosave");
+            break;
+        case 1:
+            $multiAccessTimeOutSaveQuitDefault = $this->_translate("Always");
+            break;
+        default:
+            // Unknow …
+    }
     $oEvent->set("surveysettings.{$this->id}", array(
       'name' => get_class($this),
       'settings' => array(
@@ -249,6 +265,19 @@ class reloadAnyResponse extends PluginBase {
             'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$allowAdminUserDefault)),
           ),
           'current'=>$this->get('allowAdminUser','Survey',$oEvent->get('survey'),"")
+        ),
+        'replaceEditResponse' => array(
+            'type'=>'select',
+              'options'=>array(
+                1 =>gT("Yes"),
+                0 =>gT("No"),
+              ),
+              'htmlOptions'=>array(
+                'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$replaceEditResponseDefault)),
+              ),
+            'label'=>$this->_translate("Replace edit response in browse response interface."),
+            'help'=>$this->_translate("When an admin user want to edit an existing response : he was redirected to editing the public survey."),
+            'current'=>$this->get('replaceEditResponse','Survey',$oEvent->get('survey'),"")
         ),
         'allowTokenUser'=>array(
           'type' => 'select',
@@ -316,15 +345,26 @@ class reloadAnyResponse extends PluginBase {
           ),
           'current'=>$this->get('multiAccessTimeAlert','Survey',$oEvent->get('survey'),"")
         ),
+        'multiAccessTimeOutSaveQuit'=>array(
+            'type'=>'select',
+            'label' => $this->_translate("Close survey after save"),
+            'help' => $this->_translate("If enable : return to information page."),
+            'htmlOptions' => array(
+                'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$multiAccessTimeOutSaveQuitDefault)),
+            ),
+            'options'=>array(
+                0=>"Never",
+                1=>"With autosave",
+                2=>"Always",
+            ),
+            'current'=>$this->get('multiAccessTimeOutSaveQuit','Survey',$oEvent->get('survey'),"")
+        ),
       ),
     ));
   }
 
   public function beforeControllerAction()
   {
-    if(!$this->get('replaceEditResponse') || !$this->get('allowAdminUser')) {
-      return;
-    }
     if($this->getEvent()->get("controller") != "admin") {
       return;
     }
@@ -337,6 +377,9 @@ class reloadAnyResponse extends PluginBase {
     $surveyid = App()->getRequest()->getParam('surveyid');
     $srid = App()->getRequest()->getParam('id');
     if(!Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
+      return;
+    }
+    if(!$this->_getCurrentSetting('replaceEditResponse',$surveyid) || !$this->_getCurrentSetting('allowAdminUser',$surveyid)) {
       return;
     }
     $oResponse = Response::model($surveyid)->findByPk($srid);
@@ -546,8 +589,32 @@ class reloadAnyResponse extends PluginBase {
         if($multiAccessTime !== '') {
             Yii::app()->setConfig('surveysessiontime_limit',$multiAccessTime);
         }
-        $this->addAccessTimeOutScript($surveyid);
-
+        $saveAfterQuit = false;
+        if( Yii::app()->getRequest()->getParam("saveall") ) {
+            if(Yii::app()->getRequest()->getParam("reloadany-autosave") && $this->_getCurrentSetting('multiAccessTimeOutSaveQuit',$surveyid) > 0) {
+                $saveAfterQuit = true;
+            }
+            if($this->_getCurrentSetting('multiAccessTimeOutSaveQuit',$surveyid) > 1) {
+                $saveAfterQuit = true;
+            }
+        }
+        if($saveAfterQuit && Yii::getPathOfAlias('renderMessage')) {
+            $currentSrid = isset($_SESSION['survey_'.$surveyid]['srid']) ? $_SESSION['survey_'.$surveyid]['srid'] : null;
+            if($currentSrid) {
+                $oSurvey = Survey::model()->findByPk($surveyid);
+                if($oSurvey->active == "Y") {
+                    $step = isset($_SESSION['survey_'.$surveyid]['step']) ? $_SESSION['survey_'.$surveyid]['step'] : 0;
+                    LimeExpressionManager::JumpTo($step, false);
+                    $oResponse = SurveyDynamic::model($surveyid)->findByPk($currentSrid);
+                    $oResponse->lastpage = $step; // Or restart at 1st page ?
+                    // Save must force always to not submitted (draft)
+                    $oResponse->submitdate = null;
+                    $oResponse->save();
+                }
+                \reloadAnyResponse\models\surveySession::model()->deleteByPk(array('sid'=>$surveyid,'srid'=>$currentSrid));
+                \renderMessage\messageHelper::renderAlert($this->_translate("Your responses was saved with success, you can close this windows."));
+            }
+        }
         $disableMultiAccess = true;
         if($multiAccessTime === '0' /* disable by survey */|| $multiAccessTime === ''/* disable globally */) {
             $disableMultiAccess = false;
@@ -566,6 +633,7 @@ class reloadAnyResponse extends PluginBase {
         }
         $srid = App()->getRequest()->getQuery('srid');
         if(!$srid && $disableMultiAccess) {
+            $this->addAccessTimeOutScript($surveyid);
             /* Always save current srid if needed , only reload can disable this */
             \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid);
             if(isset($_SESSION['survey_'.$surveyid]['srid'])) {
@@ -583,6 +651,7 @@ class reloadAnyResponse extends PluginBase {
             $srid = $this->getCurrentSrid($surveyid);
         }
         if(!$srid) {
+            $this->addAccessTimeOutScript($surveyid);
             return;
         }
         //~ $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeCode'),null,null,$this->settings['uniqueCodeCode']['default']);
@@ -608,14 +677,16 @@ class reloadAnyResponse extends PluginBase {
         }
         
         if(!$editAllowed) {
+            $this->addAccessTimeOutScript($surveyid);
             $this->log("srid used in url without right to reload");
             return;
         }
         if($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
             $this->_endWithEditionMessage($since);
         }
-        $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
+        $this->addAccessTimeOutScript($surveyid);
         $this->_addUnloadScript($surveyid,$srid);
+        $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
   }
 
     /**
@@ -783,6 +854,9 @@ class reloadAnyResponse extends PluginBase {
       $this->_HttpException(404, $this->_translate('Response not found.'),$surveyid);
     }
     $oSurvey = Survey::model()->findByPk($surveyid);
+    if(!in_array($language,$oSurvey->getAllLanguages())) {
+        $language = $oSurvey->language;
+    }
     // Validate token : @todo review for admin user
     if(!Permission::model()->hasSurveyPermission($surveyid,'response','update') && tableExists('tokens_'.$surveyid) && !empty($oResponse->token)) {
       if($oResponse->token != $token) {
