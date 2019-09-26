@@ -125,7 +125,7 @@ class reloadAnyResponse extends PluginBase {
             'min'=>1,
             'placeholder'=>'Disable',
         ),
-        'default' => 30,
+        'default' => '',
     ),
     //~ 'multiAccessTimeOptOut'=>array(
         //~ 'type'=>'int',
@@ -470,7 +470,7 @@ class reloadAnyResponse extends PluginBase {
             Yii::app()->setConfig('surveysessiontime_limit',$multiAccessTime);
         }
         $disableMultiAccess = true;
-        if($multiAccessTime === '0') {
+        if($multiAccessTime === '0' /* disable by survey */|| $multiAccessTime === ''/* disable globally */) {
             $disableMultiAccess = false;
         }
         $this->_fixLanguage($surveyid);
