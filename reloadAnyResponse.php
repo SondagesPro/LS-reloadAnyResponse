@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.3.2
+ * @version 1.4.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -739,6 +739,7 @@ class reloadAnyResponse extends PluginBase {
         initFieldArray($surveyid, $_SESSION['survey_'.$surveyid]['fieldmap']);
     }
     loadanswers();
+    $_SESSION['survey_'.$surveyid]['reloadAnyResponse'] = $oResponse->id;
     \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid,$oResponse->id);
   }
 
