@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.4.1
+ * @version 1.4.2
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -274,11 +274,22 @@ class reloadAnyResponse extends PluginBase {
         'multiAccessTime'=>array(
           'type'=>'int',
           'label'=>$this->_translate("Time for disable multiple access (in minutes)."),
+          'help' => $this->_translate("Set to 0 to disable, leave empty for default. If disable : same response can be open at same time; last saved response overwrites the previous one."),
           'htmlOptions'=>array(
             'min'=>0,
             'placeholder' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$multiAccessTimeDefault)),
           ),
           'current'=>$this->get('multiAccessTime','Survey',$oEvent->get('survey'),"")
+        ),
+        /* Reset to not submitted when open */
+        'reloadResetSubmitted' => array(
+          'type'=>'boolean',
+          'label' => $this->_translate("Reset submitdate when load previous reponse."),
+          'help' => $this->_translate("Related to “Allow multiple responses or update responses with one token” survey setting."),
+          'htmlOptions'=>array(
+            'disabled'=>1
+          ),
+          'current'=> intval(Survey::model()->findByPk($oEvent->get('survey'))->alloweditaftercompletion != 'Y'),
         ),
       ),
     ));
