@@ -23,6 +23,7 @@ All of this options exist globally (at plugin settings page) and by survey.
 - _Allow participant with token to create or reload responses_ : With not anonymous survey ; allow user to load specific response. Particullary interseting with answer persistance to off.
 - _Create unique code automatically_ : unique code allow any user knowing this code (and the response id) to reload this response. 
 - _Allow using unique code if exist_ : If unique code exist, allow any user knowing it to edit the answer. Parameter used for the access code is `code`. for example usage of link `1234?srid=1&code=accessode` try to load the response id 1 on survey 1234 with unique access code accessode.
+- _Throw a 401 error if try to reload without rights._ : When anybody try to access a reponse, rights are tested. If current user didn't have reponse editing rights according to plugin settings and survey settings : you can choose to send a 401 or to let LimeSurvey do the action in this case.
 - _Time for disable multiple access (in minutes)_ : since editing a response by 2 person at same time can replace current response done : a time for disabling mutiple access for all response done.
 
 Only at global plugin settings

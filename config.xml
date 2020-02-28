@@ -4,11 +4,11 @@
         <name>reloadAnyResponse</name>
         <type>plugin</type>
         <creationDate>2018-04-18</creationDate>
-        <lastUpdate>2019-06-18</lastUpdate>
+        <lastUpdate>2020-02-28</lastUpdate>
         <author>Denis Chenu</author>
         <authorUrl>https://extensions.sondages.pro/reloadanyresponse</authorUrl>
         <supportUrl>https://support.sondages.pro/</supportUrl>
-        <version>1.1.4</version>
+        <version>1.5.0</version>
         <license>GNU Affero General Public License v3.0</license>
         <description><![CDATA[Allow to reload any response for admin user and respondant.]]></description>
     </metadata>

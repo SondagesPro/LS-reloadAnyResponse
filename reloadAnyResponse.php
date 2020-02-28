@@ -3,9 +3,9 @@
  * Plugin helper for limesurvey : new class and function allowing to reload any survey
  *
  * @author Denis Chenu <denis@sondages.pro>
- * @copyright 2018-2019 Denis Chenu <http://www.sondages.pro>
+ * @copyright 2018-2020 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 1.4.2
+ * @version 1.5.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -127,6 +127,16 @@ class reloadAnyResponse extends PluginBase {
         ),
         'default' => '',
     ),
+    'throwErrorRight'=>array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label' => 'Throw error when try to edit a response without right (Default)',
+        'help' => 'Send an http 401 error when srid is in url, but user did ,not have right. Else create a new response (according to survey settings).',
+        'default' => 0,
+    ),
     //~ 'multiAccessTimeOptOut'=>array(
         //~ 'type'=>'int',
         //~ 'label' => 'Auto save and close current responses (with a javascript solution) in minutes.',
@@ -217,6 +227,8 @@ class reloadAnyResponse extends PluginBase {
     $allowTokenDefault = $this->get('allowTokenUser',null,null,$this->settings['allowTokenUser']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeCreateDefault = $this->get('uniqueCodeCreate',null,null,$this->settings['uniqueCodeCreate']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeAccessDefault = $this->get('uniqueCodeAccess',null,null,$this->settings['uniqueCodeAccess']['default']) ? gT('Yes') : gT('No');
+    $throwErrorRightDefault = $this->get('throwErrorRight',null,null,$this->settings['throwErrorRight']['default']) ? gT('Yes') : gT('No');
+
     $multiAccessTimeDefault = $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) ? $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) : gT('Disable');
 
     $oEvent->set("surveysettings.{$this->id}", array(
@@ -280,6 +292,19 @@ class reloadAnyResponse extends PluginBase {
             'placeholder' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$multiAccessTimeDefault)),
           ),
           'current'=>$this->get('multiAccessTime','Survey',$oEvent->get('survey'),"")
+        ),
+        'throwErrorRight' => array(
+          'type'=>'select',
+          'options'=>array(
+            1 =>gT("Yes"),
+            0 =>gT("No"),
+          ),
+          'htmlOptions'=>array(
+            'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$throwErrorRightDefault)),
+          ),
+          'label' => $this->_translate("Throw a 401 error if try to reload without rights."),
+          'help' => $this->_translate("Send an http 401 error when srid is in url, but user did ,not have right. Else create a new response (according to survey settings)"),
+          'current'=>$this->get('throwErrorRight','Survey',$oEvent->get('survey'),"")
         ),
         /* Reset to not submitted when open */
         'reloadResetSubmitted' => array(
@@ -535,11 +560,14 @@ class reloadAnyResponse extends PluginBase {
         if(!$editAllowed && $this->_getIsActivated('allowTokenUser',$surveyid) && $this->_accessibleWithToken($oSurvey)) {
             $editAllowed = true;
         }
-        if(!$editAllowed && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
+        if(!$editAllowed && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'responses','update')) {
             $editAllowed = true;
         }
         
         if(!$editAllowed) {
+            if($this->_getIsActivated('throwErrorRight',$surveyid)) {
+                $this->_HttpException(401,$this->_translate("No right on this response"),$surveyid);
+            }
             $this->log("srid used in url without right to reload");
             return;
         }
