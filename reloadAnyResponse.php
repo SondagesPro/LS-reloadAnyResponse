@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2020 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 2.0.0
+ * @version 2.0.1
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -486,7 +486,6 @@ class reloadAnyResponse extends PluginBase {
             if($this->_getCurrentSetting('multiAccessTime',$surveyId) && $oResponse && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyId,$oResponse->id))) {
                 $this->_endWithEditionMessage($since);
             }
-            $this->log("saveSessionTime for ".$_SERVER ['HTTP_USER_AGENT'],'info');
             \reloadAnyResponse\models\surveySession::saveSessionTime($surveyId,$oResponse->id);
         }
     }
@@ -525,7 +524,6 @@ class reloadAnyResponse extends PluginBase {
         $srid = App()->getRequest()->getQuery('srid');
         if(!$srid && $disableMultiAccess) {
             /* Always save current srid if needed , only reload can disable this */
-            $this->log("saveSessionTime for ".$_SERVER ['HTTP_USER_AGENT'],'info');
             \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid);
             if(isset($_SESSION['survey_'.$surveyid]['srid'])) {
                 $this->_addUnloadScript($surveyid,$_SESSION['survey_'.$surveyid]['srid']);
@@ -783,7 +781,6 @@ class reloadAnyResponse extends PluginBase {
     }
     loadanswers();
     $_SESSION['survey_'.$surveyid]['reloadAnyResponse'] = $oResponse->id;
-    $this->log("saveSessionTime for ".$_SERVER ['HTTP_USER_AGENT'],'info');
     \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid,$oResponse->id);
   }
 

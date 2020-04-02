@@ -1,7 +1,7 @@
 <?php
 /**
  * This file is part of reloadAnyResponse plugin
- * @version 1.3.0
+ * @version 1.4.0
  */
 namespace reloadAnyResponse\models;
 use Yii;
@@ -95,6 +95,7 @@ class surveySession extends CActiveRecord
         $oSessionSurvey->lastaction = date('Y-m-d H:i:s');
         $oSessionSurvey->session = self::getSessionId();
         $oSessionSurvey->save();
+        Yii::app()->log("saveSessionTime for $srid on $sid ($token) by ".self::getUserAgent()." with ".self::getSessionId(),CLogger::LEVEL_INFO,'reloadAnyResponse.models.surveySession.saveSessionTime');
         return $oSessionSurvey;
     }
 
@@ -140,6 +141,7 @@ class surveySession extends CActiveRecord
             $oSessionSurvey->save();
             return null;
         }
+        Yii::app()->log("Session is used for $srid on $sid by ".self::getUserAgent()." with ".self::getSessionId(),CLogger::LEVEL_INFO,'reloadAnyResponse.models.surveySession.saveSessionTime');
         $lastaction = strtotime($oSessionSurvey->lastaction);
         $now = strtotime("now");
         $sinceTime = abs($lastaction - $now) / 60;
@@ -220,5 +222,18 @@ class surveySession extends CActiveRecord
         }
         Yii::import('application.helpers.common_helper', true);
         return tableExists("{{tokens_".$surveyId."}}");
+    }
+
+    /**
+     * Get the current user agent
+     * Used for login
+     * @return string
+     */
+    private static function getUserAgent()
+    {
+        if (empty($_SERVER ['HTTP_USER_AGENT'])) {
+            return "no HTTP_USER_AGENT";
+        }
+        return $_SERVER ['HTTP_USER_AGENT'];
     }
 }
