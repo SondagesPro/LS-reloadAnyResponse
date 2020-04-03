@@ -8,7 +8,7 @@
         <author>Denis Chenu</author>
         <authorUrl>https://extensions.sondages.pro/reloadanyresponse</authorUrl>
         <supportUrl>https://support.sondages.pro/</supportUrl>
-        <version>1.5.0</version>
+        <version>1.5.1</version>
         <license>GNU Affero General Public License v3.0</license>
         <description><![CDATA[Allow to reload any response for admin user and respondant.]]></description>
     </metadata>
