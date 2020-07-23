@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2020 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 2.0.1
+ * @version 2.1.0
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -136,6 +136,41 @@ class reloadAnyResponse extends PluginBase {
         'label' => 'Throw error when try to edit a response without right (Default)',
         'help' => 'Send an http 401 error when srid is in url, but user did ,not have right. Else create a new response (according to survey settings).',
         'default' => 0,
+    ),
+    'noHttpUserAgent'=>array(
+        'type'=>'select',
+        'options' => array(
+            'forbidden' => 'Disable access with a 403',
+            'action' => 'Allow access and block other access',
+        ),
+        'htmlOptions'=>array(
+            'empty'=>'Allow access but don‘t block other access',
+        ),
+        'label' => 'Action to do without HTTP_USER_AGENT',
+        'help' => 'By default : show the page but don\'t disable other access. You can choose to send a http 403 error (Forbidden).',
+        'default' => 'noaction',
+    ),
+    'botRegexp'=>array(
+        'type'=>'string',
+        'htmlOptions'=>array(
+            'placeholder'=>'/bot|crawl|slurp|spider|mediapartners|lua-resty-http/i',
+        ),
+        'label' => 'Bot regexp',
+        'help' => 'Usage of preg_match : you can add new bot or invalid request with “|newbot”.',
+        'default' => '',
+    ),
+    'botHttpUserAgent'=>array(
+        'type'=>'select',
+        'options' => array(
+            'forbidden' => 'Disable access with a 403',
+            'action' => 'Allow access and block other access',
+        ),
+        'htmlOptions'=>array(
+            'empty'=>'Allow access but don‘t block other access',
+        ),
+        'label' => 'Action to do with bot',
+        'help' => 'By default : show the page but don\'t disable other access. You can choose to send a http 403 error (Forbidden).',
+        'default' => 'noaction',
     ),
     //~ 'multiAccessTimeOptOut'=>array(
         //~ 'type'=>'int',
@@ -509,6 +544,10 @@ class reloadAnyResponse extends PluginBase {
         if($multiAccessTime === '0' /* disable by survey */|| $multiAccessTime === ''/* disable globally */) {
             $disableMultiAccess = false;
         }
+        if($disableMultiAccess) {
+            $this->checkAccessByUserAgent();
+            $disableMultiAccess = !$this->noactionByUserAgent();
+        }
         $this->_fixLanguage($surveyid);
         /* For token : @todo in beforeReloadReponse */
         /* @todo : delete surveySession is save or clearall action */
@@ -571,7 +610,7 @@ class reloadAnyResponse extends PluginBase {
             $this->log("srid used in url without right to reload");
             return;
         }
-        if($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
+        if($disableMultiAccess && $since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
             $this->_endWithEditionMessage($since);
         }
         $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
@@ -920,6 +959,60 @@ class reloadAnyResponse extends PluginBase {
 
     }
 
+    /**
+     * Check access according to HTTP_USER_AGENT
+     * @throw Exception
+     * @return void
+     */
+    private function checkAccessByUserAgent()
+    {
+        $noHttpUserAgent = $this->get('noHttpUserAgent',null,null,$this->settings['noHttpUserAgent']['default']);
+        if(empty($_SERVER['HTTP_USER_AGENT'])) {
+            if ($noHttpUserAgent == 'forbidden') {
+                header($_SERVER["SERVER_PROTOCOL"]." 403 No User Agent",true,403);
+                \renderMessage\messageHelper::renderContent($message);
+            }
+            // No action to do : can return
+            return;
+        }
+        $noBotHttpUserAgent = $this->get('botHttpUserAgent',null,null,$this->settings['botHttpUserAgent']['default']);
+        if ($noBotHttpUserAgent == 'forbidden' && $this->isBotByRegexp($_SERVER['HTTP_USER_AGENT'])) {
+            header($_SERVER["SERVER_PROTOCOL"]." 403 Bot",true,403);
+            \renderMessage\messageHelper::renderContent($message);
+        }
+    }
+
+    /**
+     * Check if need action (disable access time) by user aganet
+     * @return boolean
+     */
+    private function noactionByUserAgent()
+    {
+        $noHttpUserAgent = $this->get('noHttpUserAgent',null,null,$this->settings['noHttpUserAgent']['default']);
+        if(empty($_SERVER['HTTP_USER_AGENT'])) {
+            if ($noHttpUserAgent == 'noaction') {
+                return true;
+            }
+            // No action to do : can return
+            return false;
+        }
+        $noBotHttpUserAgent = $this->get('botHttpUserAgent',null,null,$this->settings['botHttpUserAgent']['default']);
+        if ($noBotHttpUserAgent == 'noaction' && $this->isBotByRegexp($_SERVER['HTTP_USER_AGENT'])) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check access according to HTTP_USER_AGENT
+     * @throw Exception
+     * @return void
+     */
+    private function isBotByRegexp($useragent)
+    {
+        $botRegexp = $this->get('botRegexp',null,null,$this->settings['botRegexp']['default']);
+        return preg_match($botRegexp, $useragent);
+    }
     /**
      * Get current setting for current survey (use empty string as null value)
      * @param string setting to get
