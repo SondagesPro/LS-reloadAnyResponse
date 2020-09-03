@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2020 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 2.1.0
+ * @version 2.1.1
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1006,11 +1006,17 @@ class reloadAnyResponse extends PluginBase {
     /**
      * Check access according to HTTP_USER_AGENT
      * @throw Exception
-     * @return void
+     * @return boolean
      */
     private function isBotByRegexp($useragent)
     {
         $botRegexp = $this->get('botRegexp',null,null,$this->settings['botRegexp']['default']);
+        if($botRegexp === '') {
+            $botRegexp = '/bot|crawl|slurp|spider|mediapartners|lua-resty-http/i';
+        }
+        if(!trim($botRegexp)) {
+            return false;
+        }
         return preg_match($botRegexp, $useragent);
     }
     /**
