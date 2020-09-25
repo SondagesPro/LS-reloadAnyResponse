@@ -2,7 +2,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: reloadAnyResponse\n"
-"POT-Creation-Date: 2019-06-05 10:59+0200\n"
+"POT-Creation-Date: 2020-09-25 18:46+0200\n"
 "PO-Revision-Date: 2018-04-30 08:59+0200\n"
 "Last-Translator: Denis Chenu <contact@sondages.pro>\n"
 "Language-Team: \n"
@@ -10,7 +10,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 2.2.3\n"
+"X-Generator: Poedit 2.4.1\n"
 "X-Poedit-Basepath: ..\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Poedit-KeywordsList: _translate\n"
@@ -18,58 +18,82 @@ msgstr ""
 "X-Poedit-SearchPath-0: .\n"
 "X-Poedit-SearchPathExcluded-0: locale\n"
 
-#: reloadAnyResponse.php:212
+#: reloadAnyResponse.php:274
 msgid "Allow admin user to reload any response with response id."
 msgstr ""
 
-#: reloadAnyResponse.php:218 reloadAnyResponse.php:231
-#: reloadAnyResponse.php:243 reloadAnyResponse.php:255
-#: reloadAnyResponse.php:264
+#: reloadAnyResponse.php:280 reloadAnyResponse.php:293
+#: reloadAnyResponse.php:305 reloadAnyResponse.php:317
+#: reloadAnyResponse.php:327 reloadAnyResponse.php:338
 #, php-format
 msgid "Use default (%s)"
 msgstr ""
 
-#: reloadAnyResponse.php:224
+#: reloadAnyResponse.php:286
 msgid "Allow participant with token to create or reload responses."
 msgstr ""
 
-#: reloadAnyResponse.php:225
+#: reloadAnyResponse.php:287
 msgid "Related to “Enable token-based response persistence” and “Allow multiple responses or update responses” survey settings."
 msgstr ""
 
-#: reloadAnyResponse.php:237
+#: reloadAnyResponse.php:299
 msgid "Create unique code automatically."
 msgstr ""
 
-#: reloadAnyResponse.php:249
+#: reloadAnyResponse.php:311
 msgid "Allow using unique code if exist."
 msgstr ""
 
-#: reloadAnyResponse.php:261
+#: reloadAnyResponse.php:323
 msgid "Time for disable multiple access (in minutes)."
 msgstr ""
 
-#: reloadAnyResponse.php:467
+#: reloadAnyResponse.php:324
+msgid "Set to 0 to disable, leave empty for default. If disable : same response can be open at same time; last saved response overwrites the previous one."
+msgstr ""
+
+#: reloadAnyResponse.php:340
+msgid "Throw a 401 error if try to reload without rights."
+msgstr ""
+
+#: reloadAnyResponse.php:341
+msgid "Send an http 401 error when srid is in url, but user did ,not have right. Else create a new response (according to survey settings)"
+msgstr ""
+
+#: reloadAnyResponse.php:347
+msgid "Reset submitdate when load previous reponse."
+msgstr ""
+
+#: reloadAnyResponse.php:348
+msgid "Related to “Allow multiple responses or update responses with one token” survey setting."
+msgstr ""
+
+#: reloadAnyResponse.php:559
 msgid "We save your current session, you can try to reload the survey in some minutes."
 msgstr ""
 
-#: reloadAnyResponse.php:501
+#: reloadAnyResponse.php:593
 msgid "Sorry, this response didn‘t exist."
 msgstr ""
 
-#: reloadAnyResponse.php:504
+#: reloadAnyResponse.php:596
 msgid "Sorry, this access code is invalid."
 msgstr ""
 
-#: reloadAnyResponse.php:688
+#: reloadAnyResponse.php:608
+msgid "No right on this response"
+msgstr ""
+
+#: reloadAnyResponse.php:785
 msgid "Response not found."
 msgstr ""
 
-#: reloadAnyResponse.php:694
+#: reloadAnyResponse.php:791
 msgid "Access to this response need a valid token."
 msgstr ""
 
-#: reloadAnyResponse.php:839
+#: reloadAnyResponse.php:937
 #, php-format
 msgid "Sorry, someone update this response to the questionnaire a short time ago. The last action was made less than %s minutes ago."
 msgstr ""
