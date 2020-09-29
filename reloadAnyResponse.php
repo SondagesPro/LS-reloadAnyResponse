@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2020 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 2.1.1
+ * @version 3.0.0-alpha
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -613,7 +613,7 @@ class reloadAnyResponse extends PluginBase {
         if($disableMultiAccess && $since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
             $this->_endWithEditionMessage($since);
         }
-        $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
+        $this->loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'),App()->getRequest()->getParam('code'));
         $this->_addUnloadScript($surveyid,$srid);
   }
 
@@ -755,73 +755,30 @@ class reloadAnyResponse extends PluginBase {
     }
     $messageSource=array(
         'class' => 'CGettextMessageSource',
-        'cacheID' => get_class($this).'Lang',
-        'cachingDuration'=>0,
-        'forceTranslation' => true,
+        'cachingDuration' => 3600, // 1 hour, Must reset only when needed
         'useMoFile' => true,
         'basePath' => __DIR__ . DIRECTORY_SEPARATOR.'locale',
         'catalog'=>'messages',// default from Yii
     );
-    Yii::app()->setComponent(get_class($this).'Messages',$messageSource);
+    Yii::app()->setComponent('ReloadAnyResponseMessages',$messageSource);
   }
 
-  /**
-   * Create Survey and add current response in $_SESSION
-   * @param integer $surveydi
-   * @param integer $srid
-   * @throws Error 404
-   * @todo : use the new helper
-   * @return void
-   */
-  private function _loadReponse($surveyid,$srid,$token = null)
-  {
-
-    if(isset($_SESSION['survey_'.$surveyid]['srid']) && $_SESSION['survey_'.$surveyid]['srid'] == $srid) {
-      return;
-    }
-    $oResponse = SurveyDynamic::model($surveyid)->find("id = :srid",array(':srid'=>$srid));
-    $language = Yii::app()->getLanguage();
-    if(!$oResponse) {
-      $this->_HttpException(404, $this->_translate('Response not found.'),$surveyid);
-    }
-    $oSurvey = Survey::model()->findByPk($surveyid);
-    // Validate token : @todo review for admin user
-    if(!Permission::model()->hasSurveyPermission($surveyid,'response','update') && tableExists('tokens_'.$surveyid) && !empty($oResponse->token)) {
-      if($oResponse->token != $token) {
-        $this->_HttpException(401, $this->_translate('Access to this response need a valid token.'),$surveyid);
-      }
-    }
-    killSurveySession($surveyid); // Is this needed ?
-    LimeExpressionManager::SetDirtyFlag();
-    $_SESSION['survey_'.$surveyid]['srid'] = $oResponse->id;
-    if (!empty($oResponse->lastpage)) {
-        $_SESSION['survey_'.$surveyid]['LEMtokenResume'] = true;
-        // If the response was completed start at the beginning and not at the last page - just makes more sense
-        if (empty($oResponse->submitdate)) {
-            $_SESSION['survey_'.$surveyid]['step'] = $oResponse->lastpage;
+    /**
+    * Create Survey and add current response in $_SESSION
+    * @param integer $surveydi
+    * @param integer $srid
+    * @throws Error 404
+    * @todo : use the new helper
+    * @return void
+    */
+    private function loadReponse($surveyid,$srid,$token = null, $accesscode = null)
+    {
+        if(App()->getRequest()->isPostRequest) {
+            // All post request ? 
+            \reloadAnyResponse\Utilities::resetLoadedReponse($surveyid,$srid,$token);
         }
-        if(!empty($oResponse->submitdate) && $oSurvey->alloweditaftercompletion != 'Y') {
-            $oResponse->submitdate = null;
-            $oResponse->save();
-            // Better to set Survey to alloweditaftercompletion == 'Y', but unable at this time on afterFindSurvey event
-        }
+        \reloadAnyResponse\Utilities::loadReponse($surveyid,$srid,$token,$accesscode);
     }
-    $_SESSION['survey_'.$surveyid]['s_lang'] = $language; /* buildsurveysession use session lang … , send a notic if not set */
-    buildsurveysession($surveyid);
-    if (!empty($oResponse->submitdate)) {
-        $_SESSION['survey_'.$surveyid]['maxstep'] = $_SESSION['survey_'.$surveyid]['totalsteps'];
-    }
-    if (tableExists('tokens_'.$surveyid) && !empty($oResponse->token)) {
-        $_SESSION['survey_'.$surveyid]['token'] = $oResponse->token;
-    }
-    if(version_compare(Yii::app()->getConfig('versionnumber'),"3",">=")) {
-        randomizationGroupsAndQuestions($surveyid);
-        initFieldArray($surveyid, $_SESSION['survey_'.$surveyid]['fieldmap']);
-    }
-    loadanswers();
-    $_SESSION['survey_'.$surveyid]['reloadAnyResponse'] = $oResponse->id;
-    \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid,$oResponse->id);
-  }
 
   /**
    * Create a new response for token
