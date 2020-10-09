@@ -26,7 +26,8 @@ class Utilities
 {
     CONST DefaultSettings = array(
         'allowAdminUser' => 1,
-        'allowTokenUser' => 0,
+        'allowTokenUser' => 1,
+        'allowTokenGroupUser' => 1,
         'uniqueCodeAccess' => 1,
     );
   /**
@@ -36,7 +37,7 @@ class Utilities
    * @param string $token
    * @param string $accesscode
    * @throws Errors
-   * @return void
+   * @return void|true;
    */
     public static function loadReponse($surveyid, $srid, $token = null, $accesscode = null)
     {
@@ -45,9 +46,7 @@ class Utilities
         }
         $oResponse = \SurveyDynamic::model($surveyid)->find("id = :srid",array(':srid'=>$srid));
         $language = App()->getLanguage();
-        if(!$oResponse) {
-            throw new CHttpException(404, self::translate('Response not found.'));
-        }
+
         $oSurvey = \Survey::model()->findByPk($surveyid);
         /* @var boolean, did edition is allowed with current params and settings */
         $editAllowed = false;
@@ -57,32 +56,41 @@ class Utilities
         ) {
             $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
             if(!$responseLink) {
-                throw new CHttpException(401, self::translate('Sorry, this access code is not valid.'));
+                return self::returnOrThrowException($surveyid, 401 , self::translate('Sorry, this access code is not valid.'));
             }
             if($responseLink && $responseLink->accesscode != $accesscode) {
-                throw new CHttpException(401, self::translate('Sorry, this access code is not valid.'));
+                return self::returnOrThrowException($surveyid,401, self::translate('Sorry, this access code is not valid.'));
+            }
+            if(!$oResponse) {
+                return self::returnOrThrowException($surveyid,404, self::translate('Response not found.'));
             }
             $editAllowed = true;
         }
         if (!$editAllowed
             && $token
-            && $oResponse->token
+            && !empty($oResponse->token)
             && self::getReloadAnyResponseSetting($surveyid, 'allowTokenUser')
         ) {
-            /* Check the list of token with reponseListAndManage */
-            // $oSurvey->anonymized != "Y" && tableExists("{{tokens_".$surveyid."}}"); ?
-            if(!self:checkIsValidToken($surveyid, $token, $oResponse->token)) {
-
+            if(!$oResponse) {
+                return self::returnOrThrowException($surveyid,404, self::translate('Response not found.'));
             }
-            if($token && $oResponse->token) {
-                throw new CHttpException(401, self::translate('Sorry, this token is not valid.'));
+            /* Check the list of token with reponseListAndManage */
+            if(self::getReloadAnyResponseSetting($surveyid, 'allowTokenGroupUser')) {
+                if(!self::checkIsValidToken($surveyid, $token, $oResponse->token)) {
+                    return self::returnOrThrowException($surveyid,403, self::translate('Sorry, this token is not valid.'));
+                }
+            } elseif($token != $oResponse->token) {
+                return self::returnOrThrowException($surveyid,403, self::translate('Sorry, this token is not valid.'));
             }
             $editAllowed = true;
         }
         if (!$editAllowed) {
             $havePermission = self::getReloadAnyResponseSetting($surveyid, 'allowAdminUser') && \Permission::model()->hasSurveyPermission($surveyid,'response','update');
             if (!$havePermission) {
-                throw new CHttpException(401, self::translate('Sorry, you don‘t have access to this response.'));
+                return self::returnOrThrowException($surveyid, 401, self::translate('Sorry, you don‘t have access to this response.'));
+            }
+            if(!$oResponse) {
+                return self::returnOrThrowException($surveyid, 404, self::translate('Response not found.'));
             }
         }
         killSurveySession($surveyid);
@@ -110,7 +118,13 @@ class Utilities
         randomizationGroupsAndQuestions($surveyid);
         initFieldArray($surveyid, $_SESSION['survey_'.$surveyid]['fieldmap']);
         loadanswers();
+        if(self::getReloadAnyResponseSetting($surveyid, 'replaceDefaultSave') ) {
+            $_SESSION['survey_'.$surveyid]['scid'] = self::getCurrentSrid($surveyid);
+        }
+        self::setCurrentReloadedToken($surveyid, $token);
+        self::setCurrentReloadedSrid($surveyid, self::getCurrentSrid($surveyid));
         models\surveySession::saveSessionTime($surveyid,$oResponse->id);
+        return true;
     }
 
     /**
@@ -120,7 +134,7 @@ class Utilities
      */
     public static function getCurrentSrid($surveyid)
     {
-        if ( empty($_SESSION['survey_'.$surveyid]['srid']) ) {
+        if (empty($_SESSION['survey_'.$surveyid]['srid']) ) {
             return null;
         }
         return $_SESSION['survey_'.$surveyid]['srid'];
@@ -133,20 +147,50 @@ class Utilities
      */
     public static function getCurrentReloadedSrid($surveyid)
     {
-        if ( empty($_SESSION['survey_'.$surveyid]['reloadAnyResponse']) ) {
+        if (empty($_SESSION['survey_'.$surveyid]['reloadAnyResponseSrid']) ) {
             return null;
         }
-        return $_SESSION['survey_'.$surveyid]['srid'];
+        return $_SESSION['survey_'.$surveyid]['reloadAnyResponseSrid'];
     }
 
     /**
-     * get current srid for a survey
+     * get current token for a survey
      * @param $surveyid integer
+     * @return string|null
+     */
+    public static function getCurrentReloadedToken($surveyid)
+    {
+        if (empty($_SESSION['survey_'.$surveyid]['reloadAnyResponseToken']) ) {
+            return null;
+        }
+        return $_SESSION['survey_'.$surveyid]['reloadAnyResponseToken'];
+    }
+
+    /**
+     * set current srid for a survey
+     * @param integer $surveyid 
+     * @param integer $srid
      * @return integer|null
      */
     public static function setCurrentReloadedSrid($surveyid, $srid)
     {
-        $_SESSION['survey_'.$surveyid]['reloadAnyResponse'] = $srid;
+        $_SESSION['survey_'.$surveyid]['reloadAnyResponseSrid'] = $srid;
+    }
+
+    /**
+     * gset current token for a survey
+     * @param $surveyid integer
+     * @return integer|null
+     */
+    public static function setCurrentReloadedToken($surveyid, $token)
+    {
+        if(empty($token)) {
+            return;
+        }
+        if(isset($_SESSION['survey_'.$surveyid]['token']) && $_SESSION['survey_'.$surveyid]['token'] == $token) {
+            return;
+        }
+        $_SESSION['survey_'.$surveyid]['reloadAnyResponseToken'] = $token;
     }
 
     /**
@@ -247,15 +291,47 @@ class Utilities
         if(empty($token)) {
             return false;
         }
-        if($token == $validtoken)) {
+        if($token == $validtoken) {
             return true;
         }
-        if(App()->getPathOfAlias('responseListAndManage')) {
-            if(in_array($token, \responseListAndManage\helpers\getTokensList($surveyid,$validtoken))) {
+        if(Yii::getPathOfAlias('responseListAndManage')) {
+            if(in_array($token, \responseListAndManage\helpers\tokensList::getTokensList($surveyid,$validtoken))) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Get a start url for any survey/srid
+     * @param integer $surveyd
+     * @param integer $srid
+     * @param integer $token, if is set use it, else use the current one of response
+     * @return string
+     */
+    public static function getStartUrl($surveyid, $srid, $token = null, $extraParams, $forced = false)
+    {
+        $oSurvey = \Survey::model()->findByPk($surveyid);
+        /* @var boolean, did edition is allowed with current params and settings */
+        $editAllowed = false;
+    }
+
+    /**
+     * Check if need to throw exception,
+     * return if not
+     * @param integer $surveyid
+     * @params integer error code
+     * @param string text for error
+     * @throw exception
+     * return null;
+     */
+    private static function returnOrThrowException($surveyid, $code, $text)
+    {
+        $ThrowException = self::getReloadAnyResponseSetting($surveyid, 'throwErrorRight');
+        if($ThrowException) {
+            throw new CHttpException($code, $text);
+        }
+        return;
     }
 
 }

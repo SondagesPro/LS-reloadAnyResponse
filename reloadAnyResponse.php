@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2020 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 3.0.0-alpha
+ * @version 3.0.0-alpha-1
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,9 @@ class reloadAnyResponse extends PluginBase {
   static protected $name = 'reloadAnyResponse';
 
   static protected $dbVersion = 2;
+
+  /* @var null|interger Keep reload srid in POST value, to compare with current session value */  
+  private $reloadedSrid = null;
 
   /**
    * @var array[] the settings
@@ -54,13 +57,23 @@ class reloadAnyResponse extends PluginBase {
         'default'=>0,
     ),
     'allowTokenUser' => array(
-        'type'=>'checkbox',
-        'htmlOptions'=>array(
-            'value'=>1,
-            'uncheckValue'=>0,
+        'type'=>'select',
+        'options'=>array(
+            1 => "Yes",
+            0 => "No",
         ),
         'label'=>"Allow user with a valid token.",
-        'default'=>1,
+        'default' => 1,
+    ),
+    'allowTokenGroupUser' => array(
+        'type'=>'select',
+        'options'=>array(
+            1 => "Yes",
+            0 => "No",
+        ),
+        'label'=>"Allow user with a token in same group.",
+        'help' => "Group is related to User group management from responseListAndManage plugin",
+        'default' => 1,
     ),
     'uniqueCodeCreate' => array(
         'type'=>'checkbox',
@@ -137,6 +150,16 @@ class reloadAnyResponse extends PluginBase {
         'help' => 'Send an http 401 error when srid is in url, but user did ,not have right. Else create a new response (according to survey settings).',
         'default' => 0,
     ),
+    'replaceDefaultSave'=>array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label' => 'Replace the default LimeSurvey system',
+        'help' => 'When participant trye to save a reloaded reponse : it was directly saved without showing the save form.',
+        'default' => 1,
+    ),
     'noHttpUserAgent'=>array(
         'type'=>'select',
         'options' => array(
@@ -172,24 +195,6 @@ class reloadAnyResponse extends PluginBase {
         'help' => 'By default : show the page but don\'t disable other access. You can choose to send a http 403 error (Forbidden).',
         'default' => 'noaction',
     ),
-    //~ 'multiAccessTimeOptOut'=>array(
-        //~ 'type'=>'int',
-        //~ 'label' => 'Auto save and close current responses (with a javascript solution) in minutes.',
-        //~ 'help' => 'If user didn‘t do any action on his browser during access time, save and close the windows. Set to an empty disable this feature.',
-        //~ 'htmlOptions'=>array(
-            //~ 'min'=>1,
-        //~ ),
-        //~ 'default' => 20,
-    //~ ),
-    //~ 'multiAccessTimeAlert'=>array(
-        //~ 'type'=>'int',
-        //~ 'label' => 'Time for alert shown for optout of survey',
-        //~ 'help' => 'Set to empty to disable. This alert is shown after X minutes, where X is the number here.',
-        //~ 'htmlOptions'=>array(
-            //~ 'min'=>1,
-        //~ ),
-        //~ 'default' => 18,
-    //~ ),
     //~ 'uniqueCodeCode' => array(
         //~ 'type'=>'string',
         //~ 'label'=>"Code in GET params to test.",
@@ -219,6 +224,8 @@ class reloadAnyResponse extends PluginBase {
     $this->subscribe('beforeSurveyPage');
     /* Replace existing system if srid = new */
     $this->subscribe('beforeLoadResponse');
+    /* Add a checker when multiple tabe is open */
+    $this->subscribe('beforeQuestionRender');
     /* Survey settings */
     $this->subscribe('beforeSurveySettings');
     $this->subscribe('newSurveySettings');
@@ -260,10 +267,11 @@ class reloadAnyResponse extends PluginBase {
     /* currentDefault translation */
     $allowAdminUserDefault = $this->get('allowAdminUser',null,null,$this->settings['allowAdminUser']['default']) ? gT('Yes') : gT('No');
     $allowTokenDefault = $this->get('allowTokenUser',null,null,$this->settings['allowTokenUser']['default']) ? gT('Yes') : gT('No');
+    $allowTokenGroupUserDefault = $this->get('allowTokenGroupUser',null,null,$this->settings['allowTokenGroupUser']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeCreateDefault = $this->get('uniqueCodeCreate',null,null,$this->settings['uniqueCodeCreate']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeAccessDefault = $this->get('uniqueCodeAccess',null,null,$this->settings['uniqueCodeAccess']['default']) ? gT('Yes') : gT('No');
     $throwErrorRightDefault = $this->get('throwErrorRight',null,null,$this->settings['throwErrorRight']['default']) ? gT('Yes') : gT('No');
-
+    $replaceDefaultSaveDefault =  $this->get('replaceDefaultSave',null,null,$this->settings['replaceDefaultSave']['default']) ? gT('Yes') : gT('No');
     $multiAccessTimeDefault = $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) ? $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) : gT('Disable');
 
     $oEvent->set("surveysettings.{$this->id}", array(
@@ -286,13 +294,26 @@ class reloadAnyResponse extends PluginBase {
           'label' => $this->_translate("Allow participant with token to create or reload responses."),
           'help' => $this->_translate("Related to “Enable token-based response persistence” and “Allow multiple responses or update responses” survey settings."),
           'options'=>array(
-            1 =>gT("Yes"),
-            0 =>gT("No"),
+            1 => gT("Yes"),
+            0 => gT("No"),
           ),
           'htmlOptions'=>array(
             'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$allowTokenDefault)),
           ),
           'current'=>$this->get('allowTokenUser','Survey',$oEvent->get('survey'),"")
+        ),
+        'allowTokenGroupUser'=>array(
+          'type' => 'select',
+          'label' => $this->_translate("Allow participant with token in same group to create or reload responses."),
+          'help' => $this->_translate("Related to responseListAndManage user. This need allowing token user to reload reponse."),
+          'options'=>array(
+            1 => gT("Yes"),
+            0 => gT("No"),
+          ),
+          'htmlOptions'=>array(
+            'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$allowTokenGroupUserDefault)),
+          ),
+          'current'=>$this->get('allowTokenGroupUser','Survey',$oEvent->get('survey'),"")
         ),
         'uniqueCodeCreate'=>array(
           'type'=>'select',
@@ -340,6 +361,20 @@ class reloadAnyResponse extends PluginBase {
           'label' => $this->_translate("Throw a 401 error if try to reload without rights."),
           'help' => $this->_translate("Send an http 401 error when srid is in url, but user did ,not have right. Else create a new response (according to survey settings)"),
           'current'=>$this->get('throwErrorRight','Survey',$oEvent->get('survey'),"")
+        ),
+        /* Replacing save */
+        'replaceDefaultSave' => array(
+          'type'=>'select',
+          'options'=>array(
+            1 =>gT("Yes"),
+            0 =>gT("No"),
+          ),
+          'htmlOptions'=>array(
+            'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$replaceDefaultSaveDefault)),
+          ),
+          'label' => $this->_translate("Save reloaded response transparently."),
+          'help' => $this->_translate("Replace the LimeSurvey save form : directly save the current reponse when user click on save all"),
+          'current'=>$this->get('replaceDefaultSave','Survey',$oEvent->get('survey'),"")
         ),
         /* Reset to not submitted when open */
         'reloadResetSubmitted' => array(
@@ -524,6 +559,7 @@ class reloadAnyResponse extends PluginBase {
             \reloadAnyResponse\models\surveySession::saveSessionTime($surveyId,$oResponse->id);
         }
     }
+    
     /* @todo : control what happen with useleft > 1 and tokenanswerspersistence != "Y" */
 
   }
@@ -534,8 +570,9 @@ class reloadAnyResponse extends PluginBase {
         /* Save current session Id to allow same user to reload survey in same browser */
         /* resetAllSessionVariables regenerate session id */
         /* Keep previous session id, if user reload start url it reset the sessionId, need to leav access */
-
         $surveyid = $this->getEvent()->get('surveyId');
+
+        /* Multiple access to same survey checking */
         $multiAccessTime = $this->_getCurrentSetting('multiAccessTime',$surveyid);
         if($multiAccessTime !== '') {
             Yii::app()->setConfig('surveysessiontime_limit',$multiAccessTime);
@@ -548,7 +585,7 @@ class reloadAnyResponse extends PluginBase {
             $this->checkAccessByUserAgent();
             $disableMultiAccess = !$this->noactionByUserAgent();
         }
-        $this->_fixLanguage($surveyid);
+
         /* For token : @todo in beforeReloadReponse */
         /* @todo : delete surveySession is save or clearall action */
         if($disableMultiAccess && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid))) {
@@ -560,63 +597,53 @@ class reloadAnyResponse extends PluginBase {
                 'class'=>'alert alert-info',
             ));
         }
+        /* Check POST and current session : throw error if needed */
+        if(App()->getRequest()->getPost('reloadAnyResponseSrid')) {
+            $currentSrid = isset($_SESSION['survey_'.$surveyid ]['srid']) ? $_SESSION['survey_'.$surveyid ]['srid'] : null;
+            if($currentSrid != App()->getRequest()->getPost('reloadAnyResponseSrid')) {
+                throw new CHttpException(400, $this->_translate("Your current session seems invalid with current data."));
+            }
+            $token = \reloadAnyResponse\Utilities::getCurrentReloadedToken($surveyid);
+            /* It's a POST : potential issue with edit response already submitted */
+            \reloadAnyResponse\Utilities::resetLoadedReponse($surveyid, $currentSrid, $token);
+            $this->reloadedSrid = $currentSrid;
+            return;
+        }
+        /* Check srid */
         $srid = App()->getRequest()->getQuery('srid');
-        if(!$srid && $disableMultiAccess) {
-            /* Always save current srid if needed , only reload can disable this */
-            \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid);
-            if(isset($_SESSION['survey_'.$surveyid]['srid'])) {
-                $this->_addUnloadScript($surveyid,$_SESSION['survey_'.$surveyid]['srid']);
+        if(!$srid) {
+            $this->reloadedSrid = \reloadAnyResponse\Utilities::getCurrentReloadedSrid($surveyid);
+            if($disableMultiAccess) {
+                /* Always save current srid if needed , only reload can disable this */
+                \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid);
             }
             return;
         }
         $oSurvey = Survey::model()->findByPk($surveyid);
         $token = App()->getRequest()->getParam('token');
         if($srid == "new") {
-            // Done in beforeLoadResponse
-          return;
+            // Done in beforeLoadResponse, needed only with token related survey
+           return;
         }
-        if(!$srid) {
-            $srid = $this->getCurrentSrid($surveyid);
+        if ($this->loadReponse($surveyid, $srid, App()->getRequest()->getParam('token'),App()->getRequest()->getParam('code')) ) {
+            $this->reloadedSrid = $srid;
         }
-        if(!$srid) {
-            return;
-        }
-        //~ $accesscode = App()->getRequest()->getQuery($this->get('uniqueCodeCode'),null,null,$this->settings['uniqueCodeCode']['default']);
-        $accesscode = App()->getRequest()->getQuery('code');
-        $editAllowed = false;
-        if($accesscode && $this->_getIsActivated('uniqueCodeAccess',$surveyid)) {
-            $responseLink = \reloadAnyResponse\models\responseLink::model()->findByPk(array('sid'=>$surveyid,'srid'=>$srid));
-            if($responseLink && $responseLink->accesscode == $accesscode) {
-                $editAllowed = true;
-            }
-            if(!$responseLink) {
-                $this->_HttpException(404,$this->_translate("Sorry, this response didn‘t exist."),$surveyid);
-            }
-            if($responseLink && $responseLink->accesscode != $accesscode) {
-                $this->_HttpException(401,$this->_translate("Sorry, this access code is invalid."),$surveyid);
-            }
-        }
-        if(!$editAllowed && $this->_getIsActivated('allowTokenUser',$surveyid) && $this->_accessibleWithToken($oSurvey)) {
-            $editAllowed = true;
-        }
-        if(!$editAllowed && $this->_getIsActivated('allowAdminUser',$surveyid) && Permission::model()->hasSurveyPermission($surveyid,'responses','update')) {
-            $editAllowed = true;
-        }
-        
-        if(!$editAllowed) {
-            if($this->_getIsActivated('throwErrorRight',$surveyid)) {
-                $this->_HttpException(401,$this->_translate("No right on this response"),$surveyid);
-            }
-            $this->log("srid used in url without right to reload");
-            return;
-        }
-        if($disableMultiAccess && $since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
-            $this->_endWithEditionMessage($since);
-        }
-        $this->loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'),App()->getRequest()->getParam('code'));
-        $this->_addUnloadScript($surveyid,$srid);
   }
 
+
+    /**
+     * @see beforeQuestionRender event
+     * Adding a POST value with current reloaded Srid
+     * @return void
+     */
+    public function beforeQuestionRender()
+    {
+        if($this->reloadedSrid) {
+            $hiddenInput = CHtml::hiddenField('reloadAnyResponseSrid',$this->reloadedSrid);
+            $this->getEvent()->set("answers",$this->getEvent()->get("answers").$hiddenInput);
+        }
+        $this->reloadedSrid = null;
+    }
     /**
      * Delete SurveySession for this event srid
      */
@@ -648,7 +675,7 @@ class reloadAnyResponse extends PluginBase {
      * @param $responseId
      * @return @void
      */
-    private function _addUnloadScript($surveyId,$responseId)
+    private function addUnloadScript($surveyId,$responseId)
     {
         $ajaxUrl = Yii::app()->getController()->createUrl('plugins/direct', array('plugin' => get_class($this), 'function' => 'close','sid'=>$surveyId,'srid'=>$responseId));
         $onBeforeUnload = "window.onbeforeunload = function(e) {\n";
@@ -765,19 +792,17 @@ class reloadAnyResponse extends PluginBase {
 
     /**
     * Create Survey and add current response in $_SESSION
-    * @param integer $surveydi
+    * @param integer $surveyid
     * @param integer $srid
-    * @throws Error 404
-    * @todo : use the new helper
-    * @return void
+    * @param string $token
+    * @param string $accesscode
+    * @throws Error
+    * @return void|true
     */
     private function loadReponse($surveyid,$srid,$token = null, $accesscode = null)
     {
-        if(App()->getRequest()->isPostRequest) {
-            // All post request ? 
-            \reloadAnyResponse\Utilities::resetLoadedReponse($surveyid,$srid,$token);
-        }
-        \reloadAnyResponse\Utilities::loadReponse($surveyid,$srid,$token,$accesscode);
+        /* Utilities check access */
+        return \reloadAnyResponse\Utilities::loadReponse($surveyid,$srid,$token,$accesscode);
     }
 
   /**
@@ -843,6 +868,7 @@ class reloadAnyResponse extends PluginBase {
 
     /**
      * Save current srid if exist in specific session
+     * @todo : unused, remove it
      * @return void
      */
     public function saveCurrentSrid($surveyId)
@@ -861,6 +887,7 @@ class reloadAnyResponse extends PluginBase {
 
     /**
      * Get current srid if exist in specific session
+     * @todo : unused, remove it
      * @return integer|null
      */
     public function getCurrentSrid($surveyId)
