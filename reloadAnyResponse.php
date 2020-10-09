@@ -222,6 +222,8 @@ class reloadAnyResponse extends PluginBase {
     /* Get the survey by srid and code */
     /* Save current session */
     $this->subscribe('beforeSurveyPage');
+    /* Some needed action when srid is set */
+    $this->subscribe('getPluginTwigPath');
     /* Replace existing system if srid = new */
     $this->subscribe('beforeLoadResponse');
     /* Add a checker when multiple tabe is open */
@@ -229,6 +231,7 @@ class reloadAnyResponse extends PluginBase {
     /* Survey settings */
     $this->subscribe('beforeSurveySettings');
     $this->subscribe('newSurveySettings');
+
     /* delete current session*/
     $this->subscribe("afterSurveyComplete",'deleteSurveySession');
     $this->subscribe("afterSurveyQuota",'deleteSurveySession');
@@ -622,6 +625,7 @@ class reloadAnyResponse extends PluginBase {
         $oSurvey = Survey::model()->findByPk($surveyid);
         $token = App()->getRequest()->getParam('token');
         if($srid == "new") {
+            $this->reloadedSrid = "new";
             // Done in beforeLoadResponse, needed only with token related survey
            return;
         }
@@ -631,6 +635,16 @@ class reloadAnyResponse extends PluginBase {
   }
 
 
+    /**
+     * @see getPluginTwigPath event
+     * Do some action when srid is potentially set
+     */
+    public function getPluginTwigPath()
+    {
+        if($this->reloadedSrid == "new") {
+            /* check activation */
+        }
+    }
     /**
      * @see beforeQuestionRender event
      * Adding a POST value with current reloaded Srid

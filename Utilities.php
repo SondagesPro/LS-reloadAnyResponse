@@ -29,7 +29,10 @@ class Utilities
         'allowTokenUser' => 1,
         'allowTokenGroupUser' => 1,
         'uniqueCodeAccess' => 1,
+        'uniqueCodeCreate' => 0,
+        'replaceDefaultSave' => 1,
     );
+
   /**
    * Create Survey and add current response in $_SESSION
    * @param integer $surveydi
@@ -217,7 +220,8 @@ class Utilities
             array(":name" => 'reloadAnyResponse')
         );
         if(!$oPlugin || !$oPlugin->active) {
-            return $default;
+            $this->currentSettings[$surveyId][$sSetting] = null;
+            return null;
         }
         $oSetting = \PluginSetting::model()->find(
             'plugin_id = :pluginid AND '.App()->getDb()->quoteColumnName('key').' = :key AND model = :model AND model_id = :surveyid',
@@ -231,6 +235,7 @@ class Utilities
         if(!empty($oSetting)) {
             $value = json_decode($oSetting->value);
             if($value !== '') {
+                $this->currentSettings[$surveyId][$sSetting] = $value;
                 return $value;
             }
         }

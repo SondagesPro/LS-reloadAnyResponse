@@ -75,6 +75,19 @@ Sample usage in beforeSurveyPage for example.
     $reloadReponse->startSurvey($step);
 ````
 
+### StartUrl utilitie : get start url for other plugin
+
+- Allow to get the valid start url for another plugin, if surey is with token : need token except for admin user.
+
+Sample usage
+````
+    $oStartUrl = new \reloadAnyResponse\StartUrl($surveyId, $token);
+    $startUrl = $oStartUrl->getUrl($srif, array('myparam' => $myValue), true);
+    if($startUrl) {
+        echo CHtml::link("reload survey",$startUrl);
+    }
+````
+
 ## Contribute and issue
 
 Contribution are welcome, for patch and issue : use [gitlab]( https://gitlab.com/SondagesPro/coreAndTools/reloadAnyResponse).

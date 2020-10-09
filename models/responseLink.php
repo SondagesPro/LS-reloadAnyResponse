@@ -96,6 +96,7 @@ class responseLink extends CActiveRecord
         $aRules = array(
             array('sid', 'required'),
             array('srid', 'required'),
+            array('accesscode', 'required'),
             array('sid,srid', 'numerical', 'integerOnly'=>true),
             array('srid', 'unique', 'criteria'=>array(
                     'condition'=>'sid=:sid',
