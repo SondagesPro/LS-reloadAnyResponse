@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2020 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 3.0.0-alpha-1
+ * @version 3.0.0-alpha-2
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,6 +28,8 @@ class reloadAnyResponse extends PluginBase {
 
   /* @var null|interger Keep reload srid in POST value, to compare with current session value */  
   private $reloadedSrid = null;
+  /* @var null|interger Keep current surveyid */  
+  private $surveyId = null;
 
   /**
    * @var array[] the settings
@@ -609,6 +611,7 @@ class reloadAnyResponse extends PluginBase {
             $token = \reloadAnyResponse\Utilities::getCurrentReloadedToken($surveyid);
             /* It's a POST : potential issue with edit response already submitted */
             \reloadAnyResponse\Utilities::resetLoadedReponse($surveyid, $currentSrid, $token);
+            $this->surveyId = $surveyid;
             $this->reloadedSrid = $currentSrid;
             return;
         }
@@ -620,16 +623,23 @@ class reloadAnyResponse extends PluginBase {
                 /* Always save current srid if needed , only reload can disable this */
                 \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid);
             }
+            $this->surveyId = $surveyid;
             return;
         }
         $oSurvey = Survey::model()->findByPk($surveyid);
         $token = App()->getRequest()->getParam('token');
         if($srid == "new") {
-            $this->reloadedSrid = "new";
+            $oStarurl = new \reloadAnyResponse\StartUrl($surveyid,$token);
+            if($oStarurl->isAvailable()) {
+                $this->reloadedSrid = "new";
+                $this->surveyId = $surveyid;
+                /* To save replace */
+            }
             // Done in beforeLoadResponse, needed only with token related survey
            return;
         }
         if ($this->loadReponse($surveyid, $srid, App()->getRequest()->getParam('token'),App()->getRequest()->getParam('code')) ) {
+            $this->surveyId = $surveyid;
             $this->reloadedSrid = $srid;
         }
   }
@@ -641,8 +651,25 @@ class reloadAnyResponse extends PluginBase {
      */
     public function getPluginTwigPath()
     {
+        $this->unsubscribe('getPluginTwigPath');
+        if(!$this->surveyId) {
+            return;
+        }
+        $srid = \reloadAnyResponse\Utilities::getCurrentSrid($this->surveyId);
         if($this->reloadedSrid == "new") {
             /* check activation */
+            \reloadAnyResponse\Utilities::setSaveAutomatic($this->surveyId);
+            $this->reloadedSrid =  \reloadAnyResponse\Utilities::getCurrentSrid($this->surveyId);
+        }
+        if($srid) {
+            $ajaxUrl = Yii::app()->getController()->createUrl(
+                'plugins/direct',
+                array('plugin' => get_class($this), 'function' => 'close','sid'=>$this->surveyId,'srid'=>$srid)
+            );
+            $onBeforeUnload = "window.onbeforeunload = function(e) {\n";
+            $onBeforeUnload .= " jQuery.ajax({ url:'{$ajaxUrl}' });\n";
+            $onBeforeUnload .= "}\n";
+            Yii::app()->getClientScript()->registerScript("reloadAnyResponseBeforeUnload",$onBeforeUnload,CClientScript::POS_HEAD);
         }
     }
     /**
@@ -683,20 +710,6 @@ class reloadAnyResponse extends PluginBase {
         }
     }
 
-    /**
-     * Add beforeUnload script to delete session
-     * @param $surveyid
-     * @param $responseId
-     * @return @void
-     */
-    private function addUnloadScript($surveyId,$responseId)
-    {
-        $ajaxUrl = Yii::app()->getController()->createUrl('plugins/direct', array('plugin' => get_class($this), 'function' => 'close','sid'=>$surveyId,'srid'=>$responseId));
-        $onBeforeUnload = "window.onbeforeunload = function(e) {\n";
-        $onBeforeUnload .= " jQuery.ajax({ url:'{$ajaxUrl}' });\n";
-        $onBeforeUnload .= "}\n";
-        Yii::app()->getClientScript()->registerScript("reloadAnyResponseBeforeUnload",$onBeforeUnload,CClientScript::POS_HEAD);
-    }
   /**
    * Get boolean value for setting activation
    * @param string existing $setting

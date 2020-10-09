@@ -40,11 +40,16 @@ class Utilities
    * @param string $token
    * @param string $accesscode
    * @throws Errors
-   * @return void|true;
+   * @return void|true : response is reloaded (or is available for reload);
    */
     public static function loadReponse($surveyid, $srid, $token = null, $accesscode = null)
     {
         if(self::getCurrentSrid($surveyid) == $srid) {
+            $oStarurl = new \reloadAnyResponse\StartUrl($surveyid, $token);
+            if($oStarurl->isAvailable()) {
+                self::setSaveAutomatic($surveyid);
+                return true;
+            }
             return;
         }
         $oResponse = \SurveyDynamic::model($surveyid)->find("id = :srid",array(':srid'=>$srid));
@@ -121,9 +126,7 @@ class Utilities
         randomizationGroupsAndQuestions($surveyid);
         initFieldArray($surveyid, $_SESSION['survey_'.$surveyid]['fieldmap']);
         loadanswers();
-        if(self::getReloadAnyResponseSetting($surveyid, 'replaceDefaultSave') ) {
-            $_SESSION['survey_'.$surveyid]['scid'] = self::getCurrentSrid($surveyid);
-        }
+        self::setSaveAutomatic($surveyid);
         self::setCurrentReloadedToken($surveyid, $token);
         self::setCurrentReloadedSrid($surveyid, self::getCurrentSrid($surveyid));
         models\surveySession::saveSessionTime($surveyid,$oResponse->id);
@@ -261,6 +264,17 @@ class Utilities
         return null;
     }
 
+    /**
+     * Set save automatically
+     * @param integer $surveyId
+     * @retuirn void
+     */
+    public static function setSaveAutomatic($surveyid)
+    {
+        if(self::getReloadAnyResponseSetting($surveyid, 'replaceDefaultSave') ) {
+            $_SESSION['survey_'.$surveyid]['scid'] = self::getCurrentSrid($surveyid);
+        }
+    }
   /**
    * Reset a survey 
    * @param integer $surveydi
