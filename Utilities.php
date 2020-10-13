@@ -22,6 +22,7 @@ namespace reloadAnyResponse;
 use App;
 use Yii;
 use CHttpException;
+use Survey;
 class Utilities
 {
     CONST DefaultSettings = array(
@@ -45,7 +46,7 @@ class Utilities
     public static function loadReponse($surveyid, $srid, $token = null, $accesscode = null)
     {
         if(self::getCurrentSrid($surveyid) == $srid) {
-            $oStarurl = new \reloadAnyResponse\StartUrl($surveyid, $token);
+            $oStarurl = new StartUrl($surveyid, $token);
             if($oStarurl->isAvailable()) {
                 self::setSaveAutomatic($surveyid);
                 return true;
@@ -54,7 +55,6 @@ class Utilities
         }
         $oResponse = \SurveyDynamic::model($surveyid)->find("id = :srid",array(':srid'=>$srid));
         $language = App()->getLanguage();
-
         $oSurvey = \Survey::model()->findByPk($surveyid);
         /* @var boolean, did edition is allowed with current params and settings */
         $editAllowed = false;
@@ -110,10 +110,6 @@ class Utilities
             if (empty($oResponse->submitdate)) {
                 $_SESSION['survey_'.$surveyid]['step'] = $oResponse->lastpage;
             }
-            /*
-            Move it to beforeSurveyPage only if POST value
-
-            */
         }
         $_SESSION['survey_'.$surveyid]['s_lang'] = $language; /* buildsurveysession use session lang … , send a notic if not set */
         buildsurveysession($surveyid);
@@ -190,6 +186,7 @@ class Utilities
      */
     public static function setCurrentReloadedToken($surveyid, $token)
     {
+        tracevar($token);
         if(empty($token)) {
             return;
         }
@@ -319,20 +316,6 @@ class Utilities
             }
         }
         return false;
-    }
-
-    /**
-     * Get a start url for any survey/srid
-     * @param integer $surveyd
-     * @param integer $srid
-     * @param integer $token, if is set use it, else use the current one of response
-     * @return string
-     */
-    public static function getStartUrl($surveyid, $srid, $token = null, $extraParams, $forced = false)
-    {
-        $oSurvey = \Survey::model()->findByPk($surveyid);
-        /* @var boolean, did edition is allowed with current params and settings */
-        $editAllowed = false;
     }
 
     /**

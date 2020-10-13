@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2020 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 3.0.0-alpha-2
+ * @version 3.1.0-alpha-2
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -159,9 +159,39 @@ class reloadAnyResponse extends PluginBase {
             'uncheckValue'=>0,
         ),
         'label' => 'Replace the default LimeSurvey system',
-        'help' => 'When participant trye to save a reloaded reponse : it was directly saved without showing the save form.',
+        'help' => 'When participant try to save a reloaded reponse : it was directly saved without showing the save form.',
         'default' => 1,
     ),
+    'clearAllAction'=>array(
+        'type'=>'select',
+        'options'=>array(
+            'reset' => "Reset session, don‘t delete current response",
+            'partial' => "Reset session, delete current response if was not submitted.",
+            'all' => "Reset session, delete current response in any condition.",
+        ),
+        'label' => "Action when using clearall action.",
+        'help' => "Action to do when participant want to clear all. Default action by LimeSurvey was to delete not submitted response.",
+        'default' => 'partial',
+    ),
+    'clearAllActionForced'=>array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label' => "Replace clearall action even if response was not reloaded",
+        'default' => 0,
+    ),
+    'reloadResetSubmitted'=>array(
+        'type'=>'checkbox',
+        'htmlOptions'=>array(
+            'value'=>1,
+            'uncheckValue'=>0,
+        ),
+        'label' => "When survey is save or move for the 1st time : reset it as not submitted.",
+        'default' => 1,
+    ),
+    /* surveySession settings */
     'noHttpUserAgent'=>array(
         'type'=>'select',
         'options' => array(
@@ -197,11 +227,6 @@ class reloadAnyResponse extends PluginBase {
         'help' => 'By default : show the page but don\'t disable other access. You can choose to send a http 403 error (Forbidden).',
         'default' => 'noaction',
     ),
-    //~ 'uniqueCodeCode' => array(
-        //~ 'type'=>'string',
-        //~ 'label'=>"Code in GET params to test.",
-        //~ 'default'=>'code',
-    //~ ),
   );
 
   /** @inheritdoc **/
@@ -221,7 +246,11 @@ class reloadAnyResponse extends PluginBase {
     $this->subscribe('afterSurveyDelete');
     $this->subscribe('beforeSurveyDeleteMany');
 
+    /* Token can need to be resetted */
+    //$this->subscribe('beforeControllerAction');
+
     /* Get the survey by srid and code */
+    
     /* Save current session */
     $this->subscribe('beforeSurveyPage');
     /* Some needed action when srid is set */
@@ -276,7 +305,24 @@ class reloadAnyResponse extends PluginBase {
     $uniqueCodeCreateDefault = $this->get('uniqueCodeCreate',null,null,$this->settings['uniqueCodeCreate']['default']) ? gT('Yes') : gT('No');
     $uniqueCodeAccessDefault = $this->get('uniqueCodeAccess',null,null,$this->settings['uniqueCodeAccess']['default']) ? gT('Yes') : gT('No');
     $throwErrorRightDefault = $this->get('throwErrorRight',null,null,$this->settings['throwErrorRight']['default']) ? gT('Yes') : gT('No');
-    $replaceDefaultSaveDefault =  $this->get('replaceDefaultSave',null,null,$this->settings['replaceDefaultSave']['default']) ? gT('Yes') : gT('No');
+    $replaceDefaultSaveDefault = $this->get('replaceDefaultSave',null,null,$this->settings['replaceDefaultSave']['default']) ? gT('Yes') : gT('No');
+    $clearAllActionDefault = $this->get('clearAllAction',null,null,$this->settings['clearAllAction']['default']);
+    $reloadResetSubmittedDefault = $this->get('reloadResetSubmitted',null,null,$this->settings['reloadResetSubmitted']['default']);
+
+    switch($clearAllActionDefault) {
+        case 'reset':
+            $clearAllActionDefault = $this->_translate("Do not delete");
+            break;
+        case 'all':
+            $clearAllActionDefault = $this->_translate("Always delete");
+            break;
+        case 'partial':
+            $clearAllActionDefault = $this->_translate("Delete not submitted");
+            break;
+        default:
+            /* Must not come here, show the current value */
+    }
+    $clearAllActionForcedDefault =  $this->get('clearAllActionForced',null,null,$this->settings['clearAllActionForced']['default']) ? gT('Yes') : gT('No');
     $multiAccessTimeDefault = $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) ? $this->get('multiAccessTime',null,null,$this->settings['multiAccessTime']['default']) : gT('Disable');
 
     $oEvent->set("surveysettings.{$this->id}", array(
@@ -381,49 +427,119 @@ class reloadAnyResponse extends PluginBase {
           'help' => $this->_translate("Replace the LimeSurvey save form : directly save the current reponse when user click on save all"),
           'current'=>$this->get('replaceDefaultSave','Survey',$oEvent->get('survey'),"")
         ),
+        /* Clear all action */
+        'clearAllAction' => array(
+          'type'=>'select',
+          'options'=>array(
+            'reset' =>gT("Reset session, don‘t delete current response"),
+            'partial' =>gT("Reset session, delete current response if was not submitted."),
+            'all' =>gT("Reset session, delete current response in any condition."),
+          ),
+          'htmlOptions'=>array(
+            'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$clearAllActionDefault)),
+          ),
+          'label' => $this->_translate("Action when using clearall action."),
+          'help' => $this->_translate("Action to do when participant want to clear all. Default action by LimeSurvey was to delete not submitted answer."),
+          'current'=>$this->get('clearAllAction','Survey',$oEvent->get('survey'),"")
+        ),
+        'clearAllActionForced' => array(
+          'type'=>'select',
+          'options'=>array(
+            1 =>gT("Yes"),
+            0 =>gT("No"),
+          ),
+          'htmlOptions'=>array(
+            'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$clearAllActionForcedDefault)),
+          ),
+          'label' => $this->_translate("Replace clearall action even if response is not reloaded."),
+          'current'=>$this->get('clearAllActionForced','Survey',$oEvent->get('survey'),"")
+        ),
         /* Reset to not submitted when open */
         'reloadResetSubmitted' => array(
-          'type'=>'boolean',
-          'label' => $this->_translate("Reset submitdate when load previous reponse."),
-          'help' => $this->_translate("Related to “Allow multiple responses or update responses with one token” survey setting."),
-          'htmlOptions'=>array(
-            'disabled'=>1
+          'type'=>'select',
+          'options'=>array(
+            1 =>gT("Yes"),
+            0 =>gT("No"),
           ),
-          'current'=> intval(Survey::model()->findByPk($oEvent->get('survey'))->alloweditaftercompletion != 'Y'),
+          'label' => $this->_translate("Reset submitdate when save previous reponse."),
+          'help' => $this->_translate("If allow edit after completion is off, this was done automatically."),
+          'htmlOptions'=>array(
+            'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$replaceDefaultSaveDefault)),
+          ),
+          'current'=>$this->get('reloadResetSubmitted','Survey',$oEvent->get('survey'),"")
         ),
       ),
     ));
   }
 
-  public function beforeControllerAction()
-  {
-    if(!$this->get('replaceEditResponse') || !$this->get('allowAdminUser')) {
-      return;
-    }
-    if($this->getEvent()->get("controller") != "admin") {
-      return;
-    }
-    if($this->getEvent()->get("action") != "dataentry") {
-      return;
-    }
-    if($this->getEvent()->get("subaction") != "editdata") {
-      return;
-    }
-    $surveyid = App()->getRequest()->getParam('surveyid');
-    $srid = App()->getRequest()->getParam('id');
-    if(!Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
-      return;
-    }
-    $oResponse = Response::model($surveyid)->findByPk($srid);
-    if(empty($oResponse)) {
-      return;
-    }
-    $surveyLink = Yii::app()->createUrl("survey/index", array('sid' => $surveyid,'srid'=>$srid,'newtest'=>'Y'));
+    /**
+     * When need to do something 
+     */
+    public function beforeControllerAction()
+    {
+        if($this->getEvent()->get("controller") == "survey" && $this->getEvent()->get("action") == "index") {
+            $this->checkSurveyAttributes();
+        }
+        if(!$this->get('replaceEditResponse') || !$this->get('allowAdminUser')) {
+            return;
+        }
+        if($this->getEvent()->get("controller") != "admin") {
+            return;
+        }
+        if($this->getEvent()->get("action") != "dataentry") {
+            return;
+        }
+        if($this->getEvent()->get("subaction") != "editdata") {
+            return;
+        }
+        $surveyid = App()->getRequest()->getParam('surveyid');
+        $srid = App()->getRequest()->getParam('id');
+        if(!Permission::model()->hasSurveyPermission($surveyid,'response','update')) {
+            return;
+        }
+        $oResponse = Response::model($surveyid)->findByPk($srid);
+        if(empty($oResponse)) {
+            return;
+        }
+        $surveyLink = Yii::app()->createUrl("survey/index", array('sid' => $surveyid,'srid'=>$srid,'newtest'=>'Y'));
 
-    $this->getEvent()->set('run',false);
-    App()->getController()->redirect($surveyLink);
-  }
+        $this->getEvent()->set('run',false);
+        App()->getController()->redirect($surveyLink);
+    }
 
+    /**
+     * Check if survey seetings need to be updated with current params
+     * @return void
+     */
+    public function checkSurveyAttributes()
+    {
+        $sid = App()->getRequest()->getParam('sid');
+        $srid = App()->getRequest()->getParam('srid');
+        if(empty($srid)) {
+            $srid = \reloadAnyResponse\Utilities::getCurrentSrid($sid);
+        }
+        if(empty($srid)) {
+            return;
+        }
+        $token = App()->getRequest()->getParam('token');
+        if(empty($token)) {
+            $token = \reloadAnyResponse\Utilities::getCurrentReloadedToken($sid);
+        }
+        $startUrl = new \reloadAnyResponse\StartUrl($sid,$token);
+        if(!$startUrl->isAvailable()) {
+            return;
+        }
+        $this->subscribe('afterFindSurvey', 'setSurveyEditable');
+    }
+
+    /**
+     * Set a surey as editable
+     * @see afterFindSurvey event
+     */
+    public function setSurveyEditable()
+    {
+        $this->getEvent()->set('alloweditaftercompletion','Y');
+    }
   /** @inheritdoc **/
   public function newSurveySettings()
   {
@@ -602,6 +718,13 @@ class reloadAnyResponse extends PluginBase {
                 'class'=>'alert alert-info',
             ));
         }
+        /* Clear all action */
+        $isClearAll = (App()->request->getPost('clearall') == 'clearall' || App()->request->getPost('move') == 'clearall') && App()->request->getPost('confirm-clearall') == 'confirm';
+        if ($isClearAll) {
+            $this->actionOnClearAll($surveyid);
+            /* If we are there : LS must do it's own action */
+            return;
+        }
         /* Check POST and current session : throw error if needed */
         if(App()->getRequest()->getPost('reloadAnyResponseSrid')) {
             $currentSrid = isset($_SESSION['survey_'.$surveyid ]['srid']) ? $_SESSION['survey_'.$surveyid ]['srid'] : null;
@@ -610,7 +733,7 @@ class reloadAnyResponse extends PluginBase {
             }
             $token = \reloadAnyResponse\Utilities::getCurrentReloadedToken($surveyid);
             /* It's a POST : potential issue with edit response already submitted */
-            \reloadAnyResponse\Utilities::resetLoadedReponse($surveyid, $currentSrid, $token);
+            \reloadAnyResponse\Utilities::resetLoadedReponse($surveyid, $currentSrid, $token, $this->_getCurrentSetting('reloadResetSubmitted',$surveyid));
             $this->surveyId = $surveyid;
             $this->reloadedSrid = $currentSrid;
             return;
@@ -710,6 +833,103 @@ class reloadAnyResponse extends PluginBase {
         }
     }
 
+    /**
+     * action on clear all, result are end or return.
+     * @param integer $surveyId
+     * @return void
+     */
+    public function actionOnClearAll($surveyId)
+    {
+        $reloadedSrid = App()->getRequest()->getPost('reloadAnyResponseSrid');
+        if($reloadedSrid != \reloadAnyResponse\Utilities::getCurrentSrid($surveyId)) {
+            /* Must throw error : else potential deletion of bnad survey */
+            /* Lets do the default action */
+            return;
+        }
+        if(empty($reloadedSrid)) {
+            $reloadedSrid = \reloadAnyResponse\Utilities::getCurrentReloadedSrid($surveyId);
+        }
+        if(!$reloadedSrid && $this->_getCurrentSetting('clearAllActionForced', $surveyId) ) {
+            /* seems not reloaded : quit */
+            return;
+        }
+        $this->unsubscribe('getPluginTwigPath'); /* Other not needed */
+        $this->surveyId = $surveyId;
+        $this->subscribe('getPluginTwigPath', 'clearAllAction');
+        /* Disable LS core system */
+        $_POST['confirm-clearall'] = null;
+    }
+
+    public function clearAllAction()
+    {
+        $this->unsubscribe('getPluginTwigPath');
+        $surveyId = $this->surveyId;
+        $action = $this->_getCurrentSetting('clearAllAction', $surveyId);
+        /* Start by reset the session */
+        $currentSrid = \reloadAnyResponse\Utilities::getCurrentSrid($surveyId);
+        $currentToken = \reloadAnyResponse\Utilities::getCurrentReloadedToken($surveyId);
+        if(empty($currentToken) && !empty($_SESSION['survey_'.$surveyId]['token'])) {
+            $currentToken = $_SESSION['survey_'.$surveyId]['token'];
+        }
+        /* what restart url to be used ? */
+        /* mimic core, but replace according information */
+        $restartUrlParm = array(
+            'newtest' => 'Y',
+            'lang' => App()->getLanguage(),
+        );
+        if($currentToken) {
+            $restartUrlParm['token'] = $currentToken;
+        }
+        $restartComplete = false;
+        switch ($action) {
+            case 'reset':
+                $restartComplete = true;
+                break;
+            case 'partial':
+            default:
+                if(SurveyDynamic::model($surveyId)->isCompleted($currentSrid)) {
+                    $restartComplete = true;
+                    break;
+                }
+            case 'all':
+                $oResponse = Response::model($surveyId)->findByPk($currentSrid);
+                if ($oResponse->delete(true)) {
+                    if (Survey::model()->findByPk($surveyId)->savetimings == "Y") {
+                        SurveyTimingDynamic::model($surveyId)->deleteAll("id=:srid", array(":srid"=>$currentSrid)); /* delete timings ( @todo must move it to Response )*/
+                    }
+                    SavedControl::model()->deleteAll("sid=:sid and srid=:srid", array(":sid"=>$surveyId, ":srid"=>$currentSrid));
+                }
+
+        }
+        killSurveySession($surveyId);
+        if($restartComplete) {
+            $StartUrl = new \reloadAnyResponse\StartUrl($surveyId, $currentToken);
+            $restartUrl = $StartUrl->getUrl($currentSrid, $restartUrlParm, false);
+        }
+        if(empty($restartUrl)) {
+            $restartUrl = App()->createUrl("survey/index",$restartUrlParm);
+        }
+        $aSurveyinfo = getSurveyInfo($surveyId, App()->getLanguage());
+        tracevar([
+            $surveyId,
+            $aSurveyinfo
+        ]);
+        $aSurveyinfo['surveyUrl'] = $restartUrl;
+        $aSurveyinfo['include_content'] = 'clearall';
+        Yii::app()->twigRenderer->renderTemplateFromFile(
+            "layout_global.twig",
+            array(
+                'oSurvey'=> Survey::model()->findByPk($surveyId),
+                'aSurveyInfo'=>$aSurveyinfo
+            ),
+            false
+        );
+        //Yii::app()->end();
+    }
+
+    /**
+     * Get restart Url param for this current
+     */
   /**
    * Get boolean value for setting activation
    * @param string existing $setting
