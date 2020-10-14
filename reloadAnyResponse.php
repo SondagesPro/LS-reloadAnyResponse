@@ -246,9 +246,6 @@ class reloadAnyResponse extends PluginBase {
     $this->subscribe('afterSurveyDelete');
     $this->subscribe('beforeSurveyDeleteMany');
 
-    /* Token can need to be resetted */
-    //$this->subscribe('beforeControllerAction');
-
     /* Get the survey by srid and code */
     
     /* Save current session */
@@ -424,7 +421,7 @@ class reloadAnyResponse extends PluginBase {
             'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$replaceDefaultSaveDefault)),
           ),
           'label' => $this->_translate("Save reloaded response transparently."),
-          'help' => $this->_translate("Replace the LimeSurvey save form : directly save the current reponse when user click on save all"),
+          'help' => $this->_translate("Replace the LimeSurvey save form : directly save the current reponse when user click on save all. This just save the current response, if you want to quit after save : use autoSaveAndQuit plugin."),
           'current'=>$this->get('replaceDefaultSave','Survey',$oEvent->get('survey'),"")
         ),
         /* Clear all action */
@@ -462,7 +459,7 @@ class reloadAnyResponse extends PluginBase {
             0 =>gT("No"),
           ),
           'label' => $this->_translate("Reset submitdate when save previous reponse."),
-          'help' => $this->_translate("If allow edit after completion is off, this was done automatically."),
+          'help' => $this->_translate("Whan a submitted survey is open without action : nothing was updated, if user do an action : you can choose to reset the respnse to not submitted."),
           'htmlOptions'=>array(
             'empty' => CHtml::encode(sprintf($this->_translate("Use default (%s)"),$replaceDefaultSaveDefault)),
           ),
@@ -479,6 +476,7 @@ class reloadAnyResponse extends PluginBase {
     {
         if($this->getEvent()->get("controller") == "survey" && $this->getEvent()->get("action") == "index") {
             $this->checkSurveyAttributes();
+            return;
         }
         if(!$this->get('replaceEditResponse') || !$this->get('allowAdminUser')) {
             return;
@@ -711,10 +709,8 @@ class reloadAnyResponse extends PluginBase {
         /* @todo : delete surveySession is save or clearall action */
         if($disableMultiAccess && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid))) {
             /* This one is done with current session : maybe allow to keep srid in session and reload it ? */
-            $this->saveCurrentSrid($surveyid);
             killSurveySession($surveyid);
             $this->_endWithEditionMessage($since,array(
-                'comment' => $this->_translate('We save your current session, you can try to reload the survey in some minutes.'),
                 'class'=>'alert alert-info',
             ));
         }
@@ -732,7 +728,6 @@ class reloadAnyResponse extends PluginBase {
                 throw new CHttpException(400, $this->_translate("Your current session seems invalid with current data."));
             }
             $token = \reloadAnyResponse\Utilities::getCurrentReloadedToken($surveyid);
-            /* It's a POST : potential issue with edit response already submitted */
             \reloadAnyResponse\Utilities::resetLoadedReponse($surveyid, $currentSrid, $token, $this->_getCurrentSetting('reloadResetSubmitted',$surveyid));
             $this->surveyId = $surveyid;
             $this->reloadedSrid = $currentSrid;
@@ -782,7 +777,8 @@ class reloadAnyResponse extends PluginBase {
         if($this->reloadedSrid == "new") {
             /* check activation */
             \reloadAnyResponse\Utilities::setSaveAutomatic($this->surveyId);
-            $this->reloadedSrid =  \reloadAnyResponse\Utilities::getCurrentSrid($this->surveyId);
+            $srid = $this->reloadedSrid = \reloadAnyResponse\Utilities::getCurrentSrid($this->surveyId);
+            \reloadAnyResponse\Utilities::setCurrentReloadedSrid($this->surveyId,$srid);
         }
         if($srid) {
             $ajaxUrl = Yii::app()->getController()->createUrl(
@@ -790,7 +786,7 @@ class reloadAnyResponse extends PluginBase {
                 array('plugin' => get_class($this), 'function' => 'close','sid'=>$this->surveyId,'srid'=>$srid)
             );
             $onBeforeUnload = "window.onbeforeunload = function(e) {\n";
-            $onBeforeUnload .= " jQuery.ajax({ url:'{$ajaxUrl}' });\n";
+            $onBeforeUnload .= "    jQuery.ajax({ url:'{$ajaxUrl}' });\n";
             $onBeforeUnload .= "}\n";
             Yii::app()->getClientScript()->registerScript("reloadAnyResponseBeforeUnload",$onBeforeUnload,CClientScript::POS_HEAD);
         }
@@ -910,10 +906,6 @@ class reloadAnyResponse extends PluginBase {
             $restartUrl = App()->createUrl("survey/index",$restartUrlParm);
         }
         $aSurveyinfo = getSurveyInfo($surveyId, App()->getLanguage());
-        tracevar([
-            $surveyId,
-            $aSurveyinfo
-        ]);
         $aSurveyinfo['surveyUrl'] = $restartUrl;
         $aSurveyinfo['include_content'] = 'clearall';
         Yii::app()->twigRenderer->renderTemplateFromFile(
@@ -1100,51 +1092,6 @@ class reloadAnyResponse extends PluginBase {
     $oResponse->save();
     return $oResponse;
   }
-  /**
-   * @inheritdoc adding string, by default current event
-   * @param string
-   */
-  public function log($message, $level = \CLogger::LEVEL_TRACE,$logDetail = null)
-  {
-    if(!$logDetail && $this->getEvent()) {
-      $logDetail = $this->getEvent()->getEventName();
-    } // What to put if no event ?
-    parent::log($message, $level);
-    Yii::log($message, $level,'application.plugins.reloadAnyResponse.'.$logDetail);
-  }
-
-    /**
-     * Save current srid if exist in specific session
-     * @todo : unused, remove it
-     * @return void
-     */
-    public function saveCurrentSrid($surveyId)
-    {
-        $currentSrid = isset($_SESSION['survey_'.$surveyId]['srid']) ? $_SESSION['survey_'.$surveyId]['srid'] : null;
-        if(!$currentSrid) {
-            return;
-        }
-        $sessionCurrentSrid = Yii::app()->session['reloadAnyResponsecurrentSrid'];
-        if(empty($sessionCurrentSrid)) {
-            $sessionCurrentSrid = array();
-        }
-        $sessionCurrentSrid[$surveyId] = $currentSrid;
-        Yii::app()->session['reloadAnyResponsecurrentSrid'] = $sessionCurrentSrid[$surveyId];
-    }
-
-    /**
-     * Get current srid if exist in specific session
-     * @todo : unused, remove it
-     * @return integer|null
-     */
-    public function getCurrentSrid($surveyId)
-    {
-        $sessionCurrentSrid = Yii::app()->session['reloadAnyResponsecurrentSrid'];
-        if(empty($sessionCurrentSrid) || empty($sessionCurrentSrid[$surveyId])) {
-            return;
-        }
-        return $sessionCurrentSrid[$surveyId];
-    }
 
     /**
      * Did this survey have token with reload available
@@ -1351,4 +1298,18 @@ class reloadAnyResponse extends PluginBase {
         }
         Yii::app()->setLanguage($currentLang);
     }
+
+    /**
+    * @inheritdoc adding string, by default current event
+    * @param string
+    */
+    public function log($message, $level = \CLogger::LEVEL_TRACE,$logDetail = null)
+    {
+        if(!$logDetail && $this->getEvent()) {
+            $logDetail = $this->getEvent()->getEventName();
+        } // What to put if no event ?
+        parent::log($message, $level);
+        Yii::log($message, $level,'application.plugins.reloadAnyResponse.'.$logDetail);
+    }
+
 }

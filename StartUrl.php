@@ -54,8 +54,9 @@ class StartUrl
     }
 
     /**
-     * Validate if reload is available with current information
-     * @throw Exception
+     * Validate if reload is available with current information,
+     * Didn't check code
+     * @return boolean
      */
     public function isAvailable()
     {
@@ -69,16 +70,16 @@ class StartUrl
         if($oSurvey->active != "Y") {
             return false;
         }
-        if($this->token && $this->getSetting( 'allowTokenUser')) {
+        if($this->token && $this->getSetting('allowTokenUser')) {
             $this->available = true;
             return $this->available;
         }
-        if($this->getSetting( 'uniqueCodeAccess')) {
+        if ($this->getSetting('uniqueCodeAccess')) {
             $this->available = true;
             return $this->available;
         }
 
-        if(Permission::model()->hasSurveyPermission($this->surveyId, 'responses', 'update') && $this->getSetting( 'allowAdminUser')) {
+        if(Permission::model()->hasSurveyPermission($this->surveyId, 'responses', 'update') && $this->getSetting('allowAdminUser')) {
             $this->available = true;
             return $this->available;
         }
@@ -163,7 +164,7 @@ class StartUrl
                 $params['code'] = $responseLink->accesscode;
                 return App()->createUrl("survey/index",$params);
             }
-            if($createCode || $this->getSetting( 'uniqueCodeCreate')) {
+            if($createCode || $this->getSetting('uniqueCodeCreate')) {
                 $responseLink = \reloadAnyResponse\models\responseLink::model()->setResponseLink($this->surveyId, $srid, $this->token);
                 if($responseLink && $responseLink->accessCode) {
                     $params['code'] = $responseLink->accesscode;

@@ -220,7 +220,6 @@ class Utilities
             array(":name" => 'reloadAnyResponse')
         );
         if(!$oPlugin || !$oPlugin->active) {
-            $this->currentSettings[$surveyId][$sSetting] = null;
             return null;
         }
         $oSetting = \PluginSetting::model()->find(
@@ -235,7 +234,6 @@ class Utilities
         if(!empty($oSetting)) {
             $value = json_decode($oSetting->value);
             if($value !== '') {
-                $this->currentSettings[$surveyId][$sSetting] = $value;
                 return $value;
             }
         }
