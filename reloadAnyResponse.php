@@ -710,9 +710,7 @@ class reloadAnyResponse extends PluginBase {
         if($disableMultiAccess && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid))) {
             /* This one is done with current session : maybe allow to keep srid in session and reload it ? */
             killSurveySession($surveyid);
-            $this->_endWithEditionMessage($since,array(
-                'class'=>'alert alert-info',
-            ));
+            $this->_endWithEditionMessage($since);
         }
         /* Clear all action */
         $isClearAll = (App()->request->getPost('clearall') == 'clearall' || App()->request->getPost('move') == 'clearall') && App()->request->getPost('confirm-clearall') == 'confirm';
@@ -836,9 +834,14 @@ class reloadAnyResponse extends PluginBase {
      */
     public function actionOnClearAll($surveyId)
     {
+        $srid = \reloadAnyResponse\Utilities::getCurrentSrid($surveyId);
+        if($srid) {
+            \reloadAnyResponse\models\surveySession::model()->deleteByPk(array('sid'=>$surveyId,'srid'=>$srid));
+        }
         $reloadedSrid = App()->getRequest()->getPost('reloadAnyResponseSrid');
-        if($reloadedSrid != \reloadAnyResponse\Utilities::getCurrentSrid($surveyId)) {
-            /* Must throw error : else potential deletion of bnad survey */
+
+        if($reloadedSrid  && $reloadedSrid != \reloadAnyResponse\Utilities::getCurrentSrid($surveyId)) {
+            /* Must throw error : else potential deletion of bad survey */
             /* Lets do the default action */
             return;
         }
@@ -895,7 +898,6 @@ class reloadAnyResponse extends PluginBase {
                     }
                     SavedControl::model()->deleteAll("sid=:sid and srid=:srid", array(":sid"=>$surveyId, ":srid"=>$currentSrid));
                 }
-
         }
         killSurveySession($surveyId);
         if($restartComplete) {
@@ -916,26 +918,22 @@ class reloadAnyResponse extends PluginBase {
             ),
             false
         );
-        //Yii::app()->end();
     }
 
     /**
-     * Get restart Url param for this current
-     */
-  /**
-   * Get boolean value for setting activation
-   * @param string existing $setting
-   * @param integer $surveyid
-   * @return boolean
-   */
-  private function _getIsActivated($setting,$surveyid)
-  {
-    $activation = $this->get($setting,'Survey',$surveyid,"");
-    if($activation === '') {
-      $activation = $this->get($setting,null,null,$this->settings[$setting]['default']);
+    * Get boolean value for setting activation
+    * @param string existing $setting
+    * @param integer $surveyid
+    * @return boolean
+    */
+    private function _getIsActivated($setting,$surveyid)
+    {
+        $activation = $this->get($setting,'Survey',$surveyid,"");
+        if($activation === '') {
+            $activation = $this->get($setting,null,null,$this->settings[$setting]['default']);
+        }
+        return (bool) $activation;
     }
-    return (bool) $activation;
-  }
     /**
     * Create needed DB
     * @return void
@@ -1110,7 +1108,7 @@ class reloadAnyResponse extends PluginBase {
      * @param string|string[] $comment array with 'comment' and 'class'
      * @return void
      */
-    private function _endWithEditionMessage($since,$comment=null)
+    private function _endWithEditionMessage($since,$comment = null)
     {
         $messageString = sprintf($this->_translate("Sorry, someone update this response to the questionnaire a short time ago. The last action was made less than %s minutes ago."),ceil($since));
         if(!Yii::getPathOfAlias('renderMessage')) {
@@ -1130,7 +1128,10 @@ class reloadAnyResponse extends PluginBase {
                     'class'=>'alert alert-info',
                 );
             }
-            $message .= CHtml::tag("div",array("class"=>$comment['class']),$comment['comment']);
+            if(!empty($comment['comment'])) {
+                $message .= CHtml::tag("div",array("class"=>$comment['class']),$comment['comment']);
+            }
+            
         }
         header($_SERVER["SERVER_PROTOCOL"]." 409 Conflict",true,409);
         \renderMessage\messageHelper::renderContent($message);

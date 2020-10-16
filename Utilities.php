@@ -156,7 +156,7 @@ class Utilities
     }
 
     /**
-     * get current token for a survey
+     * get current reloaded token for a survey
      * @param $surveyid integer
      * @return string|null
      */
@@ -166,6 +166,19 @@ class Utilities
             return null;
         }
         return $_SESSION['survey_'.$surveyid]['reloadAnyResponseToken'];
+    }
+
+    /**
+     * get current token for a survey
+     * @param $surveyid integer
+     * @return string|null
+     */
+    public static function getCurrentToken($surveyid)
+    {
+        if (empty($_SESSION['survey_'.$surveyid]['token']) ) {
+            return null;
+        }
+        return $_SESSION['survey_'.$surveyid]['token'];
     }
 
     /**
@@ -186,7 +199,6 @@ class Utilities
      */
     public static function setCurrentReloadedToken($surveyid, $token)
     {
-        tracevar($token);
         if(empty($token)) {
             return;
         }
