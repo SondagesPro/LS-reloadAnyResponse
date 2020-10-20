@@ -789,6 +789,7 @@ class reloadAnyResponse extends PluginBase {
             Yii::app()->getClientScript()->registerScript("reloadAnyResponseBeforeUnload",$onBeforeUnload,CClientScript::POS_HEAD);
         }
     }
+
     /**
      * @see beforeQuestionRender event
      * Adding a POST value with current reloaded Srid
@@ -835,9 +836,6 @@ class reloadAnyResponse extends PluginBase {
     public function actionOnClearAll($surveyId)
     {
         $srid = \reloadAnyResponse\Utilities::getCurrentSrid($surveyId);
-        if($srid) {
-            \reloadAnyResponse\models\surveySession::model()->deleteByPk(array('sid'=>$surveyId,'srid'=>$srid));
-        }
         $reloadedSrid = App()->getRequest()->getPost('reloadAnyResponseSrid');
 
         if($reloadedSrid  && $reloadedSrid != \reloadAnyResponse\Utilities::getCurrentSrid($surveyId)) {
@@ -845,9 +843,11 @@ class reloadAnyResponse extends PluginBase {
             /* Lets do the default action */
             return;
         }
+        \reloadAnyResponse\models\surveySession::model()->deleteByPk(array('sid'=>$surveyId,'srid'=>$srid));
         if(empty($reloadedSrid)) {
             $reloadedSrid = \reloadAnyResponse\Utilities::getCurrentReloadedSrid($surveyId);
         }
+        
         if(!$reloadedSrid && $this->_getCurrentSetting('clearAllActionForced', $surveyId) ) {
             /* seems not reloaded : quit */
             return;
