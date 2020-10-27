@@ -1,7 +1,7 @@
 <?php
 /**
  * This file is part of reloadAnyResponse plugin
- * @version 1.4.1
+ * @version 1.4.2
  */
 namespace reloadAnyResponse\models;
 use Yii;
@@ -141,7 +141,8 @@ class surveySession extends CActiveRecord
             $oSessionSurvey->save();
             return null;
         }
-        Yii::log("Session is used for $srid on $sid by ".self::getUserAgent()." with ".self::getSessionId(),\CLogger::LEVEL_INFO,'reloadAnyResponse.models.surveySession.saveSessionTime');
+        $token = Yii::app()->getRequest()->getParam('token');
+        Yii::log("Session is used for $srid on $sid ($token) by ".self::getUserAgent()." with ".self::getSessionId(),\CLogger::LEVEL_INFO,'reloadAnyResponse.models.surveySession.saveSessionTime');
         $lastaction = strtotime($oSessionSurvey->lastaction);
         $now = strtotime("now");
         $sinceTime = abs($lastaction - $now) / 60;
