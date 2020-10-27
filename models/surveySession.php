@@ -105,7 +105,7 @@ class surveySession extends CActiveRecord
      * @param integer $srid response id, if not set : find current session one, return if not
      * @return float|null : time (in minutes) since last action is done
      */
-    public static function getIsUsed($sid,$srid=null)
+    public static function getIsUsed($sid, $srid = null, $save = true)
     {
         if(!$srid) {
             $srid = isset($_SESSION['survey_'.$sid]['srid']) ? $_SESSION['survey_'.$sid]['srid'] : null;
@@ -124,7 +124,9 @@ class surveySession extends CActiveRecord
         $oSessionSurvey = self::model()->findByPk(array('sid'=>$sid,'srid'=>$srid));
         /* No current session save it and can quit */
         if(!$oSessionSurvey) {
-            self::saveSessionTime($sid,$srid);
+            if($save) {
+                self::saveSessionTime($sid,$srid);
+            }
             return null;
         }
         /* Same session : save time and quit */

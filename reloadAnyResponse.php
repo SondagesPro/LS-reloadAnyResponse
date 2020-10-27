@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2020 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 2.1.3
+ * @version 2.1.4
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ class reloadAnyResponse extends PluginBase {
   static protected $description = 'New class and function allowing to reload any survey.';
   static protected $name = 'reloadAnyResponse';
 
-  static protected $dbVersion = 2;
+  static protected $dbVersion = 3;
 
   /**
    * @var array[] the settings
@@ -518,10 +518,14 @@ class reloadAnyResponse extends PluginBase {
             'params' => array('token' => $token)
         ));
         if($oSurvey->alloweditaftercompletion == "Y" || empty($oResponse->submitdate)) {
-            if($this->_getCurrentSetting('multiAccessTime',$surveyId) && $oResponse && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyId,$oResponse->id))) {
+            if($this->_getCurrentSetting('multiAccessTime',$surveyId)
+                && $oResponse
+                && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyId,$oResponse->id, !$this->noactionByUserAgent()))) {
                 $this->_endWithEditionMessage($since);
             }
-            \reloadAnyResponse\models\surveySession::saveSessionTime($surveyId,$oResponse->id);
+            if(!$this->noactionByUserAgent()) {
+                \reloadAnyResponse\models\surveySession::saveSessionTime($surveyId,$oResponse->id);
+            }
         }
     }
     /* @todo : control what happen with useleft > 1 and tokenanswerspersistence != "Y" */
@@ -546,12 +550,11 @@ class reloadAnyResponse extends PluginBase {
         }
         if($disableMultiAccess) {
             $this->checkAccessByUserAgent();
-            $disableMultiAccess = !$this->noactionByUserAgent();
         }
         $this->_fixLanguage($surveyid);
         /* For token : @todo in beforeReloadReponse */
         /* @todo : delete surveySession is save or clearall action */
-        if($disableMultiAccess && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid))) {
+        if($disableMultiAccess && ($since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid, null, !$this->noactionByUserAgent()))) {
             /* This one is done with current session : maybe allow to keep srid in session and reload it ? */
             $this->saveCurrentSrid($surveyid);
             killSurveySession($surveyid);
@@ -561,7 +564,7 @@ class reloadAnyResponse extends PluginBase {
             ));
         }
         $srid = App()->getRequest()->getQuery('srid');
-        if(!$srid && $disableMultiAccess) {
+        if(!$srid && $disableMultiAccess && !$this->noactionByUserAgent()) {
             /* Always save current srid if needed , only reload can disable this */
             \reloadAnyResponse\models\surveySession::saveSessionTime($surveyid);
             if(isset($_SESSION['survey_'.$surveyid]['srid'])) {
@@ -610,7 +613,7 @@ class reloadAnyResponse extends PluginBase {
             $this->log("srid used in url without right to reload");
             return;
         }
-        if($disableMultiAccess && $since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid,$srid)) {
+        if($disableMultiAccess && $since = \reloadAnyResponse\models\surveySession::getIsUsed($surveyid, $srid, !$this->noactionByUserAgent())) {
             $this->_endWithEditionMessage($since);
         }
         $this->_loadReponse($surveyid,$srid,App()->getRequest()->getParam('token'));
@@ -718,13 +721,21 @@ class reloadAnyResponse extends PluginBase {
             $tableName = $this->api->getTable($this,'surveySession')->tableName();
             Yii::app()->getDb()->createCommand()->alterColumn($tableName,'sid','int not NULL');
             Yii::app()->getDb()->createCommand()->alterColumn($tableName,'srid','int not NULL');
-
             $tableName = $this->api->getTable($this,'responseLink')->tableName();
             Yii::app()->getDb()->createCommand()->alterColumn($tableName,'sid','int not NULL');
             Yii::app()->getDb()->createCommand()->alterColumn($tableName,'srid','int not NULL');
             $this->set("dbVersion",2);
         }
-
+        if($this->get("dbVersion") < 3 ) {
+            $tableName = $this->api->getTable($this,'surveySession')->tableName();
+            if(empty(App()->getDb()->getSchema()->getTable($tableName)->primaryKey)) {
+                Yii::app()->getDb()->createCommand()->addPrimaryKey('surveysession_sidsrid',$tableName,'sid,srid');
+            }
+            $tableName = $this->api->getTable($this,'responseLink')->tableName();
+            if(empty(App()->getDb()->getSchema()->getTable($tableName)->primaryKey)) {
+                Yii::app()->getDb()->createCommand()->addPrimaryKey('responselink_sidsrid',$tableName,'sid,srid');
+            }
+        }
         /* all done */
         $this->set("dbVersion",self::$dbVersion);
     }
