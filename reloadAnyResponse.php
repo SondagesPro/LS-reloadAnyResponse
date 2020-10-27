@@ -5,7 +5,7 @@
  * @author Denis Chenu <denis@sondages.pro>
  * @copyright 2018-2020 Denis Chenu <http://www.sondages.pro>
  * @license AGPL v3
- * @version 2.1.1
+ * @version 2.1.2
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -148,7 +148,7 @@ class reloadAnyResponse extends PluginBase {
         ),
         'label' => 'Action to do without HTTP_USER_AGENT',
         'help' => 'By default : show the page but don\'t disable other access. You can choose to send a http 403 error (Forbidden).',
-        'default' => 'noaction',
+        'default' => '',
     ),
     'botRegexp'=>array(
         'type'=>'string',
@@ -170,7 +170,7 @@ class reloadAnyResponse extends PluginBase {
         ),
         'label' => 'Action to do with bot',
         'help' => 'By default : show the page but don\'t disable other access. You can choose to send a http 403 error (Forbidden).',
-        'default' => 'noaction',
+        'default' => '',
     ),
     //~ 'multiAccessTimeOptOut'=>array(
         //~ 'type'=>'int',
@@ -990,14 +990,13 @@ class reloadAnyResponse extends PluginBase {
     {
         $noHttpUserAgent = $this->get('noHttpUserAgent',null,null,$this->settings['noHttpUserAgent']['default']);
         if(empty($_SERVER['HTTP_USER_AGENT'])) {
-            if ($noHttpUserAgent == 'noaction') {
+            if ($noHttpUserAgent == '') {
                 return true;
             }
-            // No action to do : can return
             return false;
         }
         $noBotHttpUserAgent = $this->get('botHttpUserAgent',null,null,$this->settings['botHttpUserAgent']['default']);
-        if ($noBotHttpUserAgent == 'noaction' && $this->isBotByRegexp($_SERVER['HTTP_USER_AGENT'])) {
+        if ($noBotHttpUserAgent == '' && $this->isBotByRegexp($_SERVER['HTTP_USER_AGENT'])) {
             return true;
         }
         return false;
